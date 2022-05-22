@@ -1,8 +1,9 @@
 const Binance = require('node-binance-api');
 const express = require("express");
 const app = express();
-const server = require("http").createServer(app);
-const io = require("socket.io").listen(server);
+app.use(express.static("./public"));
+const server = require("http").Server(app);
+const io = require("socket.io")(server);
 const port = process.env.PORT;
 server.listen(port || 3000);
 
