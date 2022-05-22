@@ -1,0 +1,44 @@
+<html>
+<head> 
+	<title> Chat Box </title>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<script src="socket.io/socket.io.js"></script>
+	<script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+	<script>
+		var socket = io("https://le-son.herokuapp.com");
+		
+		var myname = "Chorme";
+		
+		function chat(value){
+			$("#values").append("<br>"+value);
+		}
+		
+		socket.on("sChat", function(data){
+			chat(data);
+		});
+		
+		$(document).ready(function(){
+			$("#send").click(function(){
+				var mess = document.getElementById("mess").value;
+				if(mess!=""){
+					chat("Tôi: "+mess);
+					document.getElementById("mess").value="";
+					socket.emit("Chat",mess);
+				}
+			});
+		});
+				
+	</script>
+</head>	
+<body>
+	<center>
+	<input id="mess" type="text">
+	<input type="button" value="Send" id="send""><br><br>
+	
+	<div id="title"><h3>Messenger:</h3></div>
+
+	<div id="values"></div>
+	
+	</center>
+</body>
+</html>
