@@ -1,5 +1,6 @@
 const Binance = require('node-binance-api');
 const express = require("express");
+const Monitor = require('ping-monitor');
 const app = express();
 app.use(express.static("./public"));
 const server = require("http").Server(app);
@@ -17,6 +18,11 @@ const binance = new Binance().options({
         combineStream: 'wss://testnet.binance.vision/stream?streams=',
         stream: 'wss://testnet.binance.vision/ws/'
     },
+});
+
+const ping = new Monitor({
+    website: 'https://con-bot-ngu.herokuapp.com',
+    interval: 10 // minutes
 });
 
 const symbol = 'BTCBUSD';
@@ -128,6 +134,10 @@ io.on('connect', function (socket) {
 
 app.get("/", function (req, res) {
     res.render("index");
+});
+
+ping.on('up', function (res, state) {
+    console.log('Service is up');
 });
 
 async function main() {
