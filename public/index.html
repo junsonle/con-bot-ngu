@@ -9,46 +9,59 @@
             text-align: center;
             align: center;
         }
+
         form {
             background: gainsboro;
             width: fit-content;
             padding: 10px;
             border-radius: 10px;
         }
+
         input {
             height: 25px;
             border-radius: 5px;
         }
+
         label {
             display: inline-block;
             height: fit-content;
             width: fit-content;
             word-wrap: break-word
         }
+
         .mess {
             width: 80%;
-            border-radius:8px;
+            border-radius: 8px;
             margin: 2px;
             padding: 5px;
         }
+
         #me {
             float: right;
             background: #11bdfb;
             border-bottom-right-radius: 0px;
             text-align: right;
         }
+
         #other {
             float: left;
             border-bottom-left-radius: 0px;
             background: #d7d7d7;
             text-align: left;
         }
+
         #messagesBox {
             width: 400px;
             height: 400px;
             margin-top: 20px;
             padding: 10px;
-            overflow: scroll;
+            overflow-y: scroll;
+            border: black solid 0.5px;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar {
+            display: none;
         }
     </style>
     <script>
@@ -65,12 +78,18 @@
             run = params.run;
         });
 
+        function updateScroll() {
+            var objDiv = document.getElementById("messagesBox");
+            objDiv.scrollTop = objDiv.scrollHeight;
+        }
+
         function chat(message) {
-            if(message.userId === socket.id) {
+            if (message.userId !== 'server') {
                 $("#messagesBox").append('<label id="me" class="mess">' + message.time + '<br/>' + message.value + '</label>');
             } else {
                 $("#messagesBox").append('<label id="other" class="mess">' + message.time + '<br/>' + message.value + '</label>');
             }
+            updateScroll();
         }
 
         socket.on("price", function (data) {
@@ -99,8 +118,12 @@
 
             $("#chat").click(function () {
                 if ($("#message").val() !== "") {
-                    chat({value:$("#message").val(), userId:socket.id, time: new Date().toLocaleString()});
-                    socket.emit("clientSendMessage", {value:$("#message").val(), userId:socket.id, time: new Date().toLocaleString()});
+                    chat({value: $("#message").val(), userId: socket.id, time: new Date().toLocaleString()});
+                    socket.emit("clientSendMessage", {
+                        value: $("#message").val(),
+                        userId: socket.id,
+                        time: new Date().toLocaleString()
+                    });
                     $("#message").val("");
                 }
             });
@@ -129,14 +152,14 @@
             </tr>
         </table>
         <br/>
-<!--        <label>ON/OFF: </label>-->
+        <!--        <label>ON/OFF: </label>-->
         <input id="run" type="button" value="run" name="run"/>
     </form>
 </div>
 <div align="center">
     <input id="message" type="text" name="mess" placeholder="message"/>
     <input id="chat" type="button" value="send" name="chat"/><br>
-    <div id="messagesBox"></div>
+    <div id="messagesBox" class="box"></div>
 </div>
 </body>
 </html>

@@ -129,22 +129,37 @@ io.on('connect', function (socket) {
     io.to(socket.id).emit("listMess", listMess);
 
     socket.on('clientSendMessage', function (data) {
-        listMess.unshift(data);
+        listMess.push(data);
         console.log(socket.id + ": " + data);
         socket.broadcast.emit("serverSendMessage", data);
+        let mess = {
+            time: new Date().toLocaleString(),
+            userId: 'server'
+        };
         if (data.value === 'clear') {
-            // dong tat ca cac lenh
-            binance.futuresCancelAll().then(value => {
-                if (value.code === 200) {
-                    listMess = [];
-                    orderLong = null;
-                    orderShort = null;
-                    closeLong = null;
-                    closeShort = null;
-                    socket.emit("serverSendMessage", {...data, value: 'Done!'});
-                } else
-                    socket.emit("serverSendMessage", {...data, value: 'Error!'});
+            if (run)
+                socket.emit("serverSendMessage", {value: 'Server is runing!', ...mess});
+            else
+                // dong tat ca cac lenh
+                binance.futuresCancelAll(symbol).then(value => {
+                    if (value.code === 200) {
+                        //listMess = [];
+                        orderLong = null;
+                        orderShort = null;
+                        closeLong = null;
+                        closeShort = null;
+                        socket.emit("serverSendMessage", {value: 'Done!', ...mess});
+                    } else
+                        socket.emit("serverSendMessage", {value: 'Error!', ...mess});
+                });
+            listMess.push(mess);
+        } else if(data.value === 'open') {
+            binance.futuresOpenOrders(symbol).then(value => {
+                value.forEach(data => {
+                    socket.emit("serverSendMessage", {value: `${symbol} ${data.side === 'BUY' ? 'Open' : 'Close'} ${data.positionSide} ${data.price}`, ...mess});
+                });
             });
+            listMess.push(mess);
         }
     });
 
@@ -232,24 +247,29 @@ async function tick() {
                                             if (order.status !== 'NEW') {
                                                 // mo lenh short
                                                 openShort(Number(orderShort.price) + biendo * Math.floor(tileShort + 1), amount);
-                                            } else if (tileShort <= -2 && price >= Number(position[1].entryPrice) + topShort) {
+                                            } else if (tileShort <= -2 && positionShort === '0.000' ? true : price > Number(position[1].entryPrice) + topShort) {
                                                 // dong lenh short
                                                 binance.futuresCancel(symbol, {orderId: `${orderShort.orderId}`}).then(value => {
                                                     if (value.status === 'CANCELED')
                                                         // mo lenh short
-                                                        openShort(Math.floor(price) + biendo, amount);
+                                                        openShort(Number(orderShort.price) + biendo * Math.floor(tileShort), amount);
                                                 });
                                             }
                                         }
                                     });
                                 } else {
-                                    let tileShort = ((price - position[1].entryPrice) + topShort) / biendo;
-                                    // mo lenh short
-                                    openShort(Math.floor(position[1].entryPrice) + topShort + biendo * Math.floor(tileShort + 1), amount);
+                                    if (price - position[1].entryPrice <= topShort) {
+                                        // mo lenh short
+                                        openShort(Math.floor(position[1].entryPrice) + topShort + biendo, amount);
+                                    } else {
+                                        let tileShort = (price - position[1].entryPrice - topShort) / biendo;
+                                        // mo lenh short
+                                        openShort(Math.floor(position[1].entryPrice) + topShort + biendo * Math.floor(tileShort + 1), amount);
+                                    }
                                 }
                             }
                         } else {
-                            if (positionLong !== '0.000' && !orderLong) {
+                            if (positionLong === '0.000' && !orderLong) {
                                 // mo lenh long
                                 openLong(Math.ceil(price) - biendo, amount);
                             } else {
@@ -262,20 +282,25 @@ async function tick() {
                                             if (order.status !== 'NEW') {
                                                 // mo lenh long
                                                 openLong(Number(orderLong.price) - biendo * Math.floor(tileLong + 1), amount);
-                                            } else if (tileLong <= -2 && price < position[0].entryPrice - botLong) {
+                                            } else if (tileLong <= -2 && positionLong === '0.000' ? true : price < position[0].entryPrice - botLong) {
                                                 // dong lenh long
                                                 binance.futuresCancel(symbol, {orderId: `${orderLong.orderId}`}).then(value => {
                                                     if (value.status === 'CANCELED')
                                                         // mo lenh long
-                                                        openLong(Math.ceil(price) - biendo, amount);
+                                                        openLong(Number(orderLong.price) - biendo * Math.floor(tileLong), amount);
                                                 });
                                             }
                                         }
                                     });
                                 } else {
-                                    let tileLong = (position[0].entryPrice - price - botLong) / biendo;
-                                    // mo lenh long
-                                    openLong(Math.ceil(position[0].entryPrice) - botLong - biendo * Math.floor(tileLong + 1), amount);
+                                    if (position[0].entryPrice - price <= botLong) {
+                                        // mo lenh long
+                                        openLong(Math.ceil(position[0].entryPrice) - botLong - biendo, amount);
+                                    } else {
+                                        let tileLong = (position[0].entryPrice - price - botLong) / biendo;
+                                        // mo lenh long
+                                        openLong(Math.ceil(position[0].entryPrice) - botLong - biendo * Math.floor(tileLong + 1), amount);
+                                    }
                                 }
                             }
                         }
@@ -286,14 +311,15 @@ async function tick() {
             });
         } catch (e) {
             console.log(e);
-            io.emit("serverSendMessage", e);
-            listMess.unshift({value: e, time: new Date().toLocaleString(), userId: 'server'});
+            let mess = {value: e, time: new Date().toLocaleString(), userId: 'server'};
+            io.emit("serverSendMessage", mess);
+            listMess.push(mess);
         }
     }
     // if(!run)
     //     // dong tat ca cac lenh
-    //     await binance.futuresCancelAll().then(value => {
-    //         listMess = [];
+    //     await binance.futuresCancelAll(symbol).then(value => {
+    //         //listMess = [];
     //         orderLong = null;
     //         orderShort = null;
     //         closeLong = null;
