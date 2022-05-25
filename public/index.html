@@ -30,7 +30,7 @@
         }
 
         .mess {
-            width: 80%;
+            width: 90%;
             border-radius: 8px;
             margin: 2px;
             padding: 5px;
@@ -125,6 +125,12 @@
                         time: new Date().toLocaleString()
                     });
                     $("#message").val("");
+                }
+            });
+
+            $("#message").on('keypress', function (e) {
+                if (e.which == 13) {
+                    $("#chat").click();
                 }
             });
         });
