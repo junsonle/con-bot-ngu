@@ -188,16 +188,15 @@ io.on('connect', function (socket) {
         biendo = Number(data.biendo);
 
         console.log('Config: ', data);
-        console.log("Service " + (run ? 'on' : 'off'));
+        console.log("Trade " + (run ? 'on' : 'off'));
         socket.emit("configs", data);
+        serverSendMessage("Trade " + (run ? 'on' : 'off'));
         binance.futuresBalance().then(values => {
+            let mess = '';
             for (let value of values) {
-                let mess = '';
-                for (let value of values) {
-                    mess += `${value.asset}: ${value.balance}  ${value.crossUnPnl}<br/>`;
-                }
-                serverSendMessage(mess);
+                mess += `${value.asset}: ${value.balance}  ${value.crossUnPnl}<br/>`;
             }
+            serverSendMessage(mess);
         });
 
         tick();
