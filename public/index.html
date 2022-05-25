@@ -1,44 +1,142 @@
 <html>
-<head> 
-	<title> Chat Box </title>
-	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-	<script src="socket.io/socket.io.js"></script>
-	<script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
-	<script>
-		var socket = io("https://con-bot-ngu.herokuapp.com");
-		
-		var myname = "Chorme";
-		
-		function chat(value){
-			$("#values").append("<br>"+value);
-		}
-		
-		socket.on("sChat", function(data){
-			chat(data);
-		});
-		
-		$(document).ready(function(){
-			$("#send").click(function(){
-				var mess = document.getElementById("mess").value;
-				if(mess!=""){
-					chat("Tôi: "+mess);
-					document.getElementById("mess").value="";
-					socket.emit("Chat",mess);
-				}
-			});
-		});
-				
-	</script>
-</head>	
-<body>
-	<center>
-	<input id="mess" type="text">
-	<input type="button" value="Send" id="send"><br><br>
-	
-	<div id="title"><h3>Messenger:</h3></div>
+<head>
+    <title> Chat Box </title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <script src="socket.io/socket.io.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        body {
+            text-align: center;
+            align: center;
+        }
+        form {
+            background: gainsboro;
+            width: fit-content;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        input {
+            height: 25px;
+            border-radius: 5px;
+        }
+        label {
+            display: inline-block;
+            height: fit-content;
+            width: fit-content;
+            word-wrap: break-word
+        }
+        .mess {
+            width: 80%;
+            border-radius:8px;
+            margin: 2px;
+            padding: 5px;
+        }
+        #me {
+            float: right;
+            background: #11bdfb;
+            border-bottom-right-radius: 0px;
+            text-align: right;
+        }
+        #other {
+            float: left;
+            border-bottom-left-radius: 0px;
+            background: #d7d7d7;
+            text-align: left;
+        }
+        #messagesBox {
+            width: 400px;
+            height: 400px;
+            margin-top: 20px;
+            padding: 10px;
+            overflow: scroll;
+        }
+    </style>
+    <script>
+        const socket = io.connect("https://con-bot-ngu.herokuapp.com");
 
-	<div id="values"></div>
-	
-	</center>
+        var run;
+
+        socket.on("configs", function (params) {
+            console.log(params);
+            $("#symbol").val(params.symbol).prop('disabled', params.run);
+            $("#amount").val(params.amount).prop('disabled', params.run);
+            $("#lech").val(params.biendo).prop('disabled', params.run);
+            $("#run").val(params.run ? 'ON' : 'OFF');
+            run = params.run;
+        });
+
+        function chat(message) {
+            if(message.userId === socket.id) {
+                $("#messagesBox").append('<label id="me" class="mess">' + message.time + '<br/>' + message.value + '</label>');
+            } else {
+                $("#messagesBox").append('<label id="other" class="mess">' + message.time + '<br/>' + message.value + '</label>');
+            }
+        }
+
+        socket.on("price", function (data) {
+            $("#price").text(data);
+        });
+
+        socket.on("listMess", function (data) {
+            data.forEach(message => {
+                chat(message);
+            });
+        });
+
+        socket.on("serverSendMessage", function (message) {
+            chat(message);
+        });
+
+        $(document).ready(function () {
+            $("#run").click(function () {
+                socket.emit("run", {
+                    run: !run,
+                    symbol: $("#symbol").val(),
+                    amount: $("#amount").val(),
+                    biendo: $("#lech").val()
+                });
+            });
+
+            $("#chat").click(function () {
+                if ($("#message").val() !== "") {
+                    chat({value:$("#message").val(), userId:socket.id, time: new Date().toLocaleString()});
+                    socket.emit("clientSendMessage", {value:$("#message").val(), userId:socket.id, time: new Date().toLocaleString()});
+                    $("#message").val("");
+                }
+            });
+        });
+
+    </script>
+</head>
+<body>
+<div id="title">
+    <h3 id="price">Messenger</h3>
+</div>
+<div align="center">
+    <form id="form">
+        <table>
+            <tr>
+                <td><label>Symbol:</label></td>
+                <td><input id="symbol" type="text" name="symbol" placeholder="symbol"/></td>
+            </tr>
+            <tr>
+                <td><label>Số lượng:</label></td>
+                <td><input id="amount" type="text" name="amount" placeholder="số lượng"/></td>
+            </tr>
+            <tr>
+                <td><label>Lệch:</label></td>
+                <td><input id="lech" type="text" name="lech" placeholder="lệch"/></td>
+            </tr>
+        </table>
+        <br/>
+<!--        <label>ON/OFF: </label>-->
+        <input id="run" type="button" value="run" name="run"/>
+    </form>
+</div>
+<div align="center">
+    <input id="message" type="text" name="mess" placeholder="message"/>
+    <input id="chat" type="button" value="send" name="chat"/><br>
+    <div id="messagesBox"></div>
+</div>
 </body>
 </html>
