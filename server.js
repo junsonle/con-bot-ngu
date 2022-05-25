@@ -280,7 +280,7 @@ async function tick() {
                                                 binance.futuresCancel(symbol, {orderId: `${orderShort.orderId}`}).then(value => {
                                                     if (value.status === 'CANCELED')
                                                         // mo lenh short
-                                                        openShort(Math.round(orderShort.price) + biendo, amount);
+                                                        openShort(Math.round(price) - biendo, amount);
                                                 });
                                             }
                                         }
@@ -291,7 +291,7 @@ async function tick() {
                                         openShort(Math.round(position[1].entryPrice) + topShort + biendo, amount);
                                     } else {
                                         // mo lenh short
-                                        openShort(Math.round(orderShort.price) + biendo, amount);
+                                        openShort(Math.round(price) + biendo, amount);
                                     }
                                 }
                             }
@@ -314,7 +314,7 @@ async function tick() {
                                                 binance.futuresCancel(symbol, {orderId: `${orderLong.orderId}`}).then(value => {
                                                     if (value.status === 'CANCELED')
                                                         // mo lenh long
-                                                        openLong(Math.round(price) - biendo, amount);
+                                                        openLong(Math.round(price) + biendo, amount);
                                                 });
                                             }
                                         }
