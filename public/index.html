@@ -1,6 +1,7 @@
 <html>
 <head>
-    <title> Chat Box </title>
+    <title>Bot</title>
+    <link rel="icon" href="/robot.png">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     <script src="socket.io/socket.io.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
@@ -94,6 +95,10 @@
 
         socket.on("price", function (data) {
             $("#price").text(data);
+        });
+
+        socket.on("balance", function (data) {
+            document.title = data;
         });
 
         socket.on("listMess", function (data) {

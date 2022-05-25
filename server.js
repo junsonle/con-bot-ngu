@@ -212,6 +212,8 @@ app.get("/", function (req, res) {
     res.render("index");
 });
 
+app.get('/robot.png', (req, res) => res.status(200));
+
 ping.on('up', function (res, state) {
     console.log('Service is up');
 });
@@ -278,7 +280,7 @@ async function tick() {
                                                 binance.futuresCancel(symbol, {orderId: `${orderShort.orderId}`}).then(value => {
                                                     if (value.status === 'CANCELED')
                                                         // mo lenh short
-                                                        openShort(Number(orderShort.price) + biendo * Math.floor(tileShort), amount);
+                                                        openShort(Math.round(orderShort.price) + biendo, amount);
                                                 });
                                             }
                                         }
@@ -286,11 +288,10 @@ async function tick() {
                                 } else {
                                     if (price - position[1].entryPrice <= topShort) {
                                         // mo lenh short
-                                        openShort(Math.floor(position[1].entryPrice) + topShort + biendo, amount);
+                                        openShort(Math.round(position[1].entryPrice) + topShort + biendo, amount);
                                     } else {
-                                        let tileShort = (price - position[1].entryPrice - topShort) / biendo;
                                         // mo lenh short
-                                        openShort(Math.floor(position[1].entryPrice) + topShort + biendo * Math.floor(tileShort + 1), amount);
+                                        openShort(Math.round(orderShort.price) + biendo, amount);
                                     }
                                 }
                             }
@@ -313,7 +314,7 @@ async function tick() {
                                                 binance.futuresCancel(symbol, {orderId: `${orderLong.orderId}`}).then(value => {
                                                     if (value.status === 'CANCELED')
                                                         // mo lenh long
-                                                        openLong(Number(orderLong.price) - biendo * Math.floor(tileLong), amount);
+                                                        openLong(Math.round(price) - biendo, amount);
                                                 });
                                             }
                                         }
@@ -321,11 +322,10 @@ async function tick() {
                                 } else {
                                     if (position[0].entryPrice - price <= botLong) {
                                         // mo lenh long
-                                        openLong(Math.ceil(position[0].entryPrice) - botLong - biendo, amount);
+                                        openLong(Math.round(position[0].entryPrice) - botLong - biendo, amount);
                                     } else {
-                                        let tileLong = (position[0].entryPrice - price - botLong) / biendo;
                                         // mo lenh long
-                                        openLong(Math.ceil(position[0].entryPrice) - botLong - biendo * Math.floor(tileLong + 1), amount);
+                                        openLong(Math.round(price) - biendo, amount);
                                     }
                                 }
                             }
@@ -336,8 +336,8 @@ async function tick() {
                 }
             });
         } catch (e) {
-            console.log(e);
-            serverSendMessage(e);
+            console.log(e.code);
+            serverSendMessage(e.code);
         }
     }
     // if(!run)
@@ -356,6 +356,9 @@ async function main() {
     binance.futuresMiniTickerStream(symbol, data => {
         //console.log(data.close);
         io.emit("price", `${symbol}: ${data.close}`);
+        binance.futuresBalance().then(values => {
+            io.emit("balance", `${Number(values.filter(data => data.asset === 'BUSD')[0].balance).toFixed(2)} | BUSD`);
+        });
     });
 
 }
