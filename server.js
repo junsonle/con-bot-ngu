@@ -269,7 +269,7 @@ async function tick() {
                                 let topShort = biendo * (positionShort / amount - 1) / 2;
                                 if (orderShort) {
                                     // kiem tra lenh short
-                                    await binance.futuresOrderStatus(symbol, {orderId: `${orderShort.orderId}`}).then(order => {
+                                    await binance.futuresOrderStatus(symbol, {orderId: `${orderShort.orderId}`}).then(async order => {
                                         if (order) {
                                             let tileShort = (price - orderShort.price) / biendo;
                                             if (order.status !== 'NEW') {
@@ -277,7 +277,7 @@ async function tick() {
                                                 openShort(Number(orderShort.price) + biendo * Math.floor(tileShort + 1), amount);
                                             } else if (tileShort <= -2 && (positionShort === '0.000' ? true : price > Number(position[1].entryPrice) + topShort)) {
                                                 // dong lenh short
-                                                binance.futuresCancel(symbol, {orderId: `${orderShort.orderId}`}).then(value => {
+                                                await binance.futuresCancel(symbol, {orderId: `${orderShort.orderId}`}).then(value => {
                                                     if (value.status === 'CANCELED')
                                                         // mo lenh short
                                                         openShort(Math.round(price) - biendo, amount);
@@ -303,7 +303,7 @@ async function tick() {
                                 let botLong = biendo * (positionLong / amount - 1) / 2;
                                 if (orderLong) {
                                     // kiem tra lenh long
-                                    await binance.futuresOrderStatus(symbol, {orderId: `${orderLong.orderId}`}).then(order => {
+                                    await binance.futuresOrderStatus(symbol, {orderId: `${orderLong.orderId}`}).then(async order => {
                                         if (order) {
                                             let tileLong = (orderLong.price - price) / biendo;
                                             if (order.status !== 'NEW') {
@@ -311,7 +311,7 @@ async function tick() {
                                                 openLong(Number(orderLong.price) - biendo * Math.floor(tileLong + 1), amount);
                                             } else if (tileLong <= -2 && (positionLong === '0.000' ? true : price < position[0].entryPrice - botLong)) {
                                                 // dong lenh long
-                                                binance.futuresCancel(symbol, {orderId: `${orderLong.orderId}`}).then(value => {
+                                                await binance.futuresCancel(symbol, {orderId: `${orderLong.orderId}`}).then(value => {
                                                     if (value.status === 'CANCELED')
                                                         // mo lenh long
                                                         openLong(Math.round(price) + biendo, amount);
@@ -357,7 +357,7 @@ async function main() {
         //console.log(data.close);
         io.emit("price", `${symbol}: ${data.close}`);
         binance.futuresBalance().then(values => {
-            io.emit("balance", `${Number(values.filter(data => data.asset === 'BUSD')[0].balance).toFixed(2)} | BUSD`);
+            io.emit("balance", `${Number(values[2].balance).toFixed(2)} ${values[2].crossUnPnl >= 0 ? '+' : ''} ${Number(values[2].crossUnPnl).toFixed(2)} | BUSD`);
         });
     });
 
