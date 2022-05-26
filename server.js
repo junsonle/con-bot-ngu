@@ -1,12 +1,30 @@
 const Binance = require('node-binance-api');
-const express = require("express");
+const Express = require("express");
 const Monitor = require('ping-monitor');
-const app = express();
-app.use(express.static("./public"));
+const { Client } = require('pg');
+const app = Express();
 const server = require("http").Server(app);
-const io = require("socket.io")(server);
+const io = require('socket.io')(server);
+
+app.use(Express.static("./public"));
 const port = process.env.PORT;
 server.listen(port || 3000);
+
+const postgres = new Client({
+    user: 'bznnfglwutbcjf',
+    host: 'ec2-3-229-252-6.compute-1.amazonaws.com',
+    database: 'dcisecurskg7nf',
+    password: '58acdda7669a5493ae9d51f3751a4e5fefbbc592257e3383c2f716283042b186',
+    port: 5432,
+    ssl: {
+        rejectUnauthorized: false
+    }
+});
+
+postgres.connect(function(err) {
+    if (err) throw err;
+    console.log("Connected Postgres Database!");
+});
 
 const binance = new Binance().options({
     APIKEY: '0b38ce7ec75f99cf6e98e013637c8ec7c7bcfcc10a39190fc4bde8f5419ba39d',
@@ -117,11 +135,6 @@ async function openLong(price, amount) {
     }).catch(console.log);
 }
 
-async function startOrders(price) {
-    openLong(price - biendo, amount);
-    openShort(price + biendo, amount);
-}
-
 function serverSendMessage(message) {
     let mess = {
         value: message,
@@ -182,24 +195,26 @@ io.on('connect', function (socket) {
     });
 
     socket.on('run', function (data) {
-        run = data.run;
-        symbol = data.symbol;
-        amount = Number(data.amount);
-        biendo = Number(data.biendo);
+        postgres.query('update config set run = data.run;', (err, res) => {
+            if (err) throw err;
+            run = data.run;
+            symbol = data.symbol;
+            amount = Number(data.amount);
+            biendo = Number(data.biendo);
 
-        console.log('Config: ', data);
-        console.log("Trade " + (run ? 'on' : 'off'));
-        socket.emit("configs", data);
-        serverSendMessage("Trade " + (run ? 'on' : 'off'));
-        binance.futuresBalance().then(values => {
-            let mess = '';
-            for (let value of values) {
-                mess += `${value.asset}: ${value.balance}  ${value.crossUnPnl}<br/>`;
-            }
-            serverSendMessage(mess);
+            console.log('Config: ', data);
+            console.log("Trade " + (run ? 'on' : 'off'));
+            socket.emit("configs", data);
+            serverSendMessage("Trade " + (run ? 'on' : 'off'));
+            binance.futuresBalance().then(values => {
+                let mess = '';
+                for (let value of values) {
+                    mess += `${value.asset}: ${value.balance}  ${value.crossUnPnl}<br/>`;
+                }
+                serverSendMessage(mess);
+            });
+            tick();
         });
-
-        tick();
     });
 
     socket.on('disconnect', function () {
@@ -353,11 +368,39 @@ async function tick() {
 
 async function main() {
 
+    await postgres.query('select * from config;', (err, res) => {
+        if (err) throw err;
+        run = res.rows[0].run;
+        if (run) {
+            // dong tat ca cac lenh
+            binance.futuresCancelAll(symbol).then(value => {
+                if (value.code === 200) {
+                    //listMess = [];
+                    orderLong = null;
+                    orderShort = null;
+                    closeLong = null;
+                    closeShort = null;
+
+                    console.log("Trade " + (run ? 'on' : 'off'));
+                    serverSendMessage("Trade " + (run ? 'on' : 'off'));
+                    binance.futuresBalance().then(values => {
+                        let mess = '';
+                        for (let value of values) {
+                            mess += `${value.asset}: ${value.balance}  ${value.crossUnPnl}<br/>`;
+                        }
+                        serverSendMessage(mess);
+                    });
+                    tick();
+                }
+            });
+        }
+    });
+
     binance.futuresMiniTickerStream(symbol, data => {
         //console.log(data.close);
         io.emit("price", `${symbol}: ${data.close}`);
         binance.futuresBalance().then(values => {
-            io.emit("balance", `${Number(values[2].balance).toFixed(2)} ${values[2].crossUnPnl >= 0 ? '+' : ''} ${Number(values[2].crossUnPnl).toFixed(2)} | BUSD`);
+            io.emit("balance", `${Number(values[2].balance).toFixed(2)} ${values[2].crossUnPnl >= 0 ? '+' : ''}${Number(values[2].crossUnPnl).toFixed(2)} | BUSD`);
         });
     });
 
