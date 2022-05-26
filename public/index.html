@@ -107,7 +107,7 @@
         });
 
         socket.on("serverSendMessage", function (message) {
-            chat(message);
+            chat({...message, time: new Date(message.time).toLocaleString()});
         });
 
         $(document).ready(function () {
