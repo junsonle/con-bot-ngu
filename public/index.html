@@ -73,7 +73,7 @@
             console.log(params);
             $("#symbol").val(params.symbol).prop('disabled', params.run);
             $("#amount").val(params.amount).prop('disabled', params.run);
-            $("#lech").val(params.biendo).prop('disabled', params.run);
+            $("#range").val(params.range).prop('disabled', params.run);
             $("#run").val(params.run ? 'ON' : 'OFF');
             run = params.run;
         });
@@ -116,7 +116,7 @@
                     run: !run,
                     symbol: $("#symbol").val(),
                     amount: $("#amount").val(),
-                    biendo: $("#lech").val()
+                    range: $("#range").val()
                 });
             });
 
@@ -153,12 +153,12 @@
                 <td><input id="symbol" type="text" name="symbol" placeholder="symbol"/></td>
             </tr>
             <tr>
-                <td><label>Số lượng:</label></td>
-                <td><input id="amount" type="text" name="amount" placeholder="số lượng"/></td>
+                <td><label>Amount:</label></td>
+                <td><input id="amount" type="text" name="amount" placeholder="amount"/></td>
             </tr>
             <tr>
-                <td><label>Lệch:</label></td>
-                <td><input id="lech" type="text" name="lech" placeholder="lệch"/></td>
+                <td><label>Range:</label></td>
+                <td><input id="range" type="text" name="range" placeholder="range"/></td>
             </tr>
         </table>
         <br/>
