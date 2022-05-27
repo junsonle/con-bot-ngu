@@ -87,7 +87,7 @@
             if (message.userId !== 'server') {
                 $("#messagesBox").append('<label id="me" class="mess">' + message.time + '<br/>' + message.value + '</label>');
             } else {
-                $("#messagesBox").append('<label id="other" class="mess">' + message.time + '<br/>' + message.value + '</label>');
+                $("#messagesBox").append('<label id="other" class="mess">' + new Date(message.time).toLocaleString() + '<br/>' + message.value + '</label>');
             }
             updateScroll();
         }
@@ -107,7 +107,7 @@
         });
 
         socket.on("serverSendMessage", function (message) {
-            chat({...message, time: new Date(message.time).toLocaleString()});
+            chat(message);
         });
 
         $(document).ready(function () {
