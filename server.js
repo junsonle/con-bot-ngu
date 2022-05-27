@@ -280,77 +280,77 @@ async function tick() {
                                 });
                         }
                         positionShort = position[1].positionAmt;
-                    });
 
-                    let topShort = Number(position[1].entryPrice) + range * (positionShort / -amount - 1) / 2;
-                    if (orderShort) {
-                        // kiem tra lenh short
-                        binance.futuresOrderStatus(symbol, {orderId: `${orderShort.orderId}`}).then(order => {
-                            if (order.status === 'NEW') {
-                                if (positionShort === '0.000' || price > topShort) {
-                                    if ((price - orderShort.price) / range <= -2) {
+                        let topShort = Number(position[1].entryPrice) + range * (positionShort / -amount - 1) / 2;
+                        if (orderShort) {
+                            // kiem tra lenh short
+                            binance.futuresOrderStatus(symbol, {orderId: `${orderShort.orderId}`}).then(order => {
+                                if (order.status === 'NEW') {
+                                    if (positionShort === '0.000' || price > topShort) {
+                                        if ((price - orderShort.price) / range <= -2) {
+                                            // dong lenh short
+                                            binance.futuresCancel(symbol, {orderId: `${orderShort.orderId}`}).then(value => {
+                                                if (value.status === 'CANCELED')
+                                                    // mo lenh short
+                                                    openShort(Math.round(price) - range, amount);
+                                            });
+                                        }
+                                    } else if (orderShort.price !== order.price) {
                                         // dong lenh short
                                         binance.futuresCancel(symbol, {orderId: `${orderShort.orderId}`}).then(value => {
                                             if (value.status === 'CANCELED')
                                                 // mo lenh short
-                                                openShort(Math.round(price) - range, amount);
+                                                openShort(Math.round(topShort) + range, amount);
                                         });
                                     }
-                                } else if (orderShort.price !== order.price) {
-                                    // dong lenh short
-                                    binance.futuresCancel(symbol, {orderId: `${orderShort.orderId}`}).then(value => {
-                                        if (value.status === 'CANCELED')
-                                            // mo lenh short
-                                            openShort(Math.round(topShort) + range, amount);
-                                    });
+                                } else {
+                                    // mo lenh short
+                                    openShort(Math.round(price) + range, amount);
                                 }
-                            } else {
-                                // mo lenh short
-                                openShort(Math.round(price) + range, amount);
-                            }
-                        });
-                    } else if (price > topShort) {
-                        // mo lenh short
-                        openShort(Math.round(price) + range, amount);
-                    } else {
-                        // mo lenh short
-                        openShort(Math.round(topShort) + range, amount);
-                    }
+                            });
+                        } else if (price > topShort) {
+                            // mo lenh short
+                            openShort(Math.round(price) + range, amount);
+                        } else {
+                            // mo lenh short
+                            openShort(Math.round(topShort) + range, amount);
+                        }
 
-                    let botLong = Number(position[0].entryPrice) - range * (positionLong / amount - 1) / 2;
-                    if (orderLong) {
-                        // kiem tra lenh long
-                        binance.futuresOrderStatus(symbol, {orderId: `${orderLong.orderId}`}).then(order => {
-                            if (order.status === 'NEW') {
-                                if (positionLong === '0.000' || price < botLong) {
-                                    if ((orderLong.price - price) / range <= -2) {
+                        let botLong = Number(position[0].entryPrice) - range * (positionLong / amount - 1) / 2;
+                        if (orderLong) {
+                            // kiem tra lenh long
+                            binance.futuresOrderStatus(symbol, {orderId: `${orderLong.orderId}`}).then(order => {
+                                if (order.status === 'NEW') {
+                                    if (positionLong === '0.000' || price < botLong) {
+                                        if ((orderLong.price - price) / range <= -2) {
+                                            // dong lenh long
+                                            binance.futuresCancel(symbol, {orderId: `${orderLong.orderId}`}).then(value => {
+                                                if (value.status === 'CANCELED')
+                                                    // mo lenh long
+                                                    openLong(Math.round(price) + range, amount);
+                                            });
+                                        }
+                                    } else if (orderLong.price !== order.price) {
                                         // dong lenh long
                                         binance.futuresCancel(symbol, {orderId: `${orderLong.orderId}`}).then(value => {
                                             if (value.status === 'CANCELED')
                                                 // mo lenh long
-                                                openLong(Math.round(price) + range, amount);
+                                                openLong(Math.round(botLong) - range, amount);
                                         });
                                     }
-                                } else if (orderLong.price !== order.price) {
-                                    // dong lenh long
-                                    binance.futuresCancel(symbol, {orderId: `${orderLong.orderId}`}).then(value => {
-                                        if (value.status === 'CANCELED')
-                                            // mo lenh long
-                                            openLong(Math.round(botLong) - range, amount);
-                                    });
+                                } else {
+                                    // mo lenh long
+                                    openLong(Math.round(price) - range, amount);
                                 }
-                            } else {
-                                // mo lenh long
-                                openLong(Math.round(price) - range, amount);
-                            }
-                        });
-                    } else if (botLong > price) {
-                        // mo lenh long
-                        openLong(Math.round(price) - range, amount);
-                    } else {
-                        // mo lenh long
-                        openLong(Math.round(botLong) - range, amount);
-                    }
+                            });
+                        } else if (botLong > price) {
+                            // mo lenh long
+                            openLong(Math.round(price) - range, amount);
+                        } else {
+                            // mo lenh long
+                            openLong(Math.round(botLong) - range, amount);
+                        }
+                    });
 
                     lastPrice = price;
                 }
