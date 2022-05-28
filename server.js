@@ -27,15 +27,15 @@ postgres.connect(function (err) {
 });
 
 const binance = new Binance().options({
-    APIKEY: '0b38ce7ec75f99cf6e98e013637c8ec7c7bcfcc10a39190fc4bde8f5419ba39d',
-    APISECRET: '152d54c08d961cb72fce5348968452c4fc5034b140e9417e51859af8a6ac00e3',
-    useServerTime: true,
-    test: true,
-    urls: {
-        base: 'https://testnet.binance.vision/api/', // remove this to trade on mainnet
-        combineStream: 'wss://testnet.binance.vision/stream?streams=',
-        stream: 'wss://testnet.binance.vision/ws/'
-    },
+    APIKEY: 'qOEo1dShWcyPpWLjQoXtnrDOs4CWl1jIraojtdySSMIKHEhDQKsAKxe9kkOLvQb2',
+    APISECRET: 'kc7oXwBFGjG5mDv2vPns9MufcBqn1DwtC2gFTF8bqCFBzVz5u1UyBM4Q0gGo6T5L',
+    // useServerTime: true,
+    // test: true,
+    // urls: {
+    //     base: 'https://testnet.binance.vision/api/', // remove this to trade on mainnet
+    //     combineStream: 'wss://testnet.binance.vision/stream?streams=',
+    //     stream: 'wss://testnet.binance.vision/ws/'
+    // },
 });
 
 const ping = new Monitor({
@@ -398,7 +398,7 @@ async function main() {
         //console.log(data.close);
         io.emit("price", `${symbol}: ${data.close}`);
         binance.futuresBalance().then(values => {
-            io.emit("balance", `${Number(values[2].balance).toFixed(2)} ${values[2].crossUnPnl >= 0 ? '+' : ''}${Number(values[2].crossUnPnl).toFixed(2)} | BUSD`);
+            io.emit("balance", `${Number(values[9].balance).toFixed(2)} ${values[9].crossUnPnl >= 0 ? '+' : ''}${Number(values[9].crossUnPnl).toFixed(2)} | BUSD`);
         });
     });
 
