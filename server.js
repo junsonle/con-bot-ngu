@@ -292,10 +292,10 @@ async function tick() {
                                             binance.futuresCancel(symbol, {orderId: `${orderLong.orderId}`}).then(value => {
                                                 if (value.status === 'CANCELED')
                                                     // mo lenh long
-                                                    openLong(Math.round(price) + range, amount);
+                                                    openLong(Math.round(price) - range, amount);
                                             });
                                         }
-                                    } else if (orderLong.price !== order.price) {
+                                    } else if (order.price < Math.floor(botLong) - range) {
                                         // dong lenh long
                                         binance.futuresCancel(symbol, {orderId: `${orderLong.orderId}`}).then(value => {
                                             if (value.status === 'CANCELED')
@@ -327,10 +327,10 @@ async function tick() {
                                             binance.futuresCancel(symbol, {orderId: `${orderShort.orderId}`}).then(value => {
                                                 if (value.status === 'CANCELED')
                                                     // mo lenh short
-                                                    openShort(Math.round(price) - range, amount);
+                                                    openShort(Math.round(price) + range, amount);
                                             });
                                         }
-                                    } else if (orderShort.price !== order.price) {
+                                    } else if (order.price > Math.ceil(topShort) + range) {
                                         // dong lenh short
                                         binance.futuresCancel(symbol, {orderId: `${orderShort.orderId}`}).then(value => {
                                             if (value.status === 'CANCELED')
@@ -350,7 +350,6 @@ async function tick() {
                             // mo lenh short
                             openShort(Math.round(topShort) + range, amount);
                         }
-
 
                     });
 
