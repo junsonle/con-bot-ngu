@@ -202,7 +202,7 @@ io.on('connect', function (socket) {
 
     socket.on('run', function (data) {
         postgres.query(`update config
-                        set run=${data.run}, symbol=${data.symbol}, amount=${data.amount}, range=${data.range};`, (err, res) => {
+                        set run=${data.run}, amount=${data.amount}, range=${data.range};`, (err, res) => {
             if (err) throw err;
             run = data.run;
             symbol = data.symbol;
