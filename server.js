@@ -247,11 +247,11 @@ async function tick() {
     let positionShort = '0.000';
     while (run) {
         try {
-            binance.futuresPrices().then(async prices => {
+            binance.futuresPrices().then(prices => {
                 price = prices[symbol];
             });
             // kiem tra vi the
-            await binance.futuresPositionRisk({symbol: symbol}).then(position => {
+            await binance.futuresPositionRisk({symbol: symbol}).then(async position => {
                 if (price !== lastPrice) {
                     console.log(symbol + ": " + price);
                     if (position[0].positionAmt !== '0.000' && position[0].positionAmt !== positionLong) {
@@ -284,7 +284,7 @@ async function tick() {
                     let botLong = Number(position[0].entryPrice) - range * (positionLong / amount - 1) / 2;
                     if (orderLong) {
                         // kiem tra lenh long
-                        binance.futuresOrderStatus(symbol, {orderId: `${orderLong.orderId}`}).then(order => {
+                        await binance.futuresOrderStatus(symbol, {orderId: `${orderLong.orderId}`}).then(order => {
                             if (order.status === 'NEW') {
                                 if (positionLong === '0.000' || price < botLong) {
                                     if ((order.price - price) / range <= -2) {
@@ -319,7 +319,7 @@ async function tick() {
                     let topShort = Number(position[1].entryPrice) + range * (positionShort / -amount - 1) / 2;
                     if (orderShort) {
                         // kiem tra lenh short
-                        binance.futuresOrderStatus(symbol, {orderId: `${orderShort.orderId}`}).then(order => {
+                        await binance.futuresOrderStatus(symbol, {orderId: `${orderShort.orderId}`}).then(order => {
                             if (order.status === 'NEW') {
                                 if (positionShort === '0.000' || price > topShort) {
                                     if ((price - order.price) / range <= -2) {
