@@ -38,10 +38,10 @@ const binance = new Binance().options({
     // },
 });
 
-const ping = new Monitor({
-    website: 'https://con-bot-ngu.herokuapp.com',
-    interval: 10 // minutes
-});
+// const ping = new Monitor({
+//     website: 'https://con-bot-ngu.herokuapp.com',
+//     interval: 10 // minutes
+// });
 
 var run = false;
 var symbol = 'BTCBUSD';
@@ -236,9 +236,9 @@ app.get("/", function (req, res) {
 
 app.get('/robot.png', (req, res) => res.status(200));
 
-ping.on('up', function (res, state) {
-    console.log('Service is up');
-});
+// ping.on('up', function (res, state) {
+//     console.log('Service is up');
+// });
 
 async function tick() {
     let lastPrice = 0;
