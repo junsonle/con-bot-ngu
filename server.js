@@ -56,7 +56,6 @@ let closeLong;
 let closeShort;
 
 async function openCloseShort(price, amount) {
-    closeShort = {orderId: ''};
     await binance.futuresMultipleOrders([
         {   // dong lenh short
             symbol: symbol,
@@ -76,7 +75,6 @@ async function openCloseShort(price, amount) {
 }
 
 async function openCloseLong(price, amount) {
-    closeLong = {orderId: ''};
     await binance.futuresMultipleOrders([
         {   // dong lenh long
             symbol: symbol,
@@ -96,7 +94,7 @@ async function openCloseLong(price, amount) {
 }
 
 async function openShort(price, amount) {
-    orderShort = {orderId: ''};
+    orderShort = null;
     await binance.futuresMultipleOrders([
         {   //mo lenh short
             symbol: symbol,
@@ -116,7 +114,7 @@ async function openShort(price, amount) {
 }
 
 async function openLong(price, amount) {
-    orderLong = {orderId: ''};
+    orderLong = null;
     await binance.futuresMultipleOrders([
         {   //mo lenh long
             symbol: symbol,
@@ -164,10 +162,7 @@ io.on('connect', function (socket) {
                 binance.futuresCancelAll(symbol).then(value => {
                     if (value.code === 200) {
                         //listMess = [];
-                        orderLong = null;
-                        orderShort = null;
-                        closeLong = null;
-                        closeShort = null;
+                        orderLong = orderShort = closeLong = closeShort = null;
                         serverSendMessage('Done!');
                     } else
                         serverSendMessage('Error!');
@@ -301,7 +296,7 @@ async function tick() {
                                             if ((order.price - price) / range <= -2) {
                                                 // dong lenh long
                                                 binance.futuresCancel(symbol, {orderId: `${orderLong.orderId}`}).then(value => {
-                                                    //if (value.status === 'CANCELED')
+                                                    if (value.status === 'CANCELED')
                                                         // mo lenh long
                                                         openLong(Math.round(price) - range, amount);
                                                 });
@@ -309,7 +304,7 @@ async function tick() {
                                         } else if (order.price < Math.floor(botLong) - range) {
                                             // dong lenh long
                                             binance.futuresCancel(symbol, {orderId: `${orderLong.orderId}`}).then(value => {
-                                                //if (value.status === 'CANCELED')
+                                                if (value.status === 'CANCELED')
                                                     // mo lenh long
                                                     openLong(Math.round(botLong) - range, amount);
                                             });
@@ -336,7 +331,7 @@ async function tick() {
                                             if ((price - order.price) / range <= -2) {
                                                 // dong lenh short
                                                 binance.futuresCancel(symbol, {orderId: `${orderShort.orderId}`}).then(value => {
-                                                    //if (value.status === 'CANCELED')
+                                                    if (value.status === 'CANCELED')
                                                         // mo lenh short
                                                         openShort(Math.round(price) + range, amount);
                                                 });
@@ -344,7 +339,7 @@ async function tick() {
                                         } else if (order.price > Math.ceil(topShort) + range) {
                                             // dong lenh short
                                             binance.futuresCancel(symbol, {orderId: `${orderShort.orderId}`}).then(value => {
-                                                //if (value.status === 'CANCELED')
+                                                if (value.status === 'CANCELED')
                                                     // mo lenh short
                                                     openShort(Math.round(topShort) + range, amount);
                                             });
@@ -387,10 +382,7 @@ async function main() {
             binance.futuresCancelAll(symbol).then(value => {
                 if (value.code === 200) {
                     //listMess = [];
-                    orderLong = null;
-                    orderShort = null;
-                    closeLong = null;
-                    closeShort = null;
+                    orderLong = orderShort = closeLong = closeShort = null;
 
                     console.log("Trade " + (run ? 'on' : 'off'));
                     serverSendMessage("Trade " + (run ? 'on' : 'off'));
