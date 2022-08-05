@@ -238,9 +238,8 @@ ping.on('up', function (res, state) {
     console.log('Service is up');
 });
 
-ping.on('error', function (error, res) {
-    console.error(error);
-    ping.stop();
+ping.on('stop', function (res, state) {
+    console.log('Service is stop');
 });
 
 async function tick() {
@@ -388,7 +387,8 @@ async function main() {
                     tick();
                 }
             });
-        }
+        } else
+            ping.stop;
     });
 
     binance.futuresMiniTickerStream(symbol, data => {
