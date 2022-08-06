@@ -65,12 +65,12 @@ async function openCloseShort(price, amount) {
             positionSide: "SHORT",
             price: `${price}`,
             timeInForce: "GTC",
-            newOrderRespType: "RESULT"
+            newOrderRespType: "ACK"
         }
     ]).then((data) => {
         closeShortId = data[0].orderId;
         console.log("DONG VI THE SHORT");
-        console.log(data[0]);
+        //console.log(data[0]);
     }).catch(console.log);
 }
 
@@ -84,12 +84,12 @@ async function openCloseLong(price, amount) {
             positionSide: "LONG",
             price: `${price}`,
             timeInForce: "GTC",
-            newOrderRespType: "RESULT"
+            newOrderRespType: "ACK"
         }
     ]).then((data) => {
         closeLongId = data[0].orderId;
         console.log("DONG VI THE LONG");
-        console.log(data[0]);
+        //console.log(data[0]);
     }).catch(console.log);
 }
 
@@ -103,12 +103,12 @@ async function openShort(price, amount) {
             positionSide: "SHORT",
             price: `${price}`,
             timeInForce: "GTX",
-            newOrderRespType: "RESULT"
+            newOrderRespType: "ACK"
         }
     ]).then((data) => {
         orderShortId = data[0].orderId;
         console.log("MO LENH SHORT");
-        console.log(data[0]);
+        //console.log(data[0]);
     }).catch(console.log);
 }
 
@@ -122,12 +122,12 @@ async function openLong(price, amount) {
             positionSide: "LONG",
             price: `${price}`,
             timeInForce: "GTX",
-            newOrderRespType: "RESULT"
+            newOrderRespType: "ACK"
         }
     ]).then((data) => {
         orderLongId = data[0].orderId;
         console.log("MO LENH LONG");
-        console.log(data[0]);
+        //console.log(data[0]);
     }).catch(console.log);
 }
 
@@ -252,7 +252,7 @@ async function tick() {
                 let price = prices[symbol];
 
                 if (price !== lastPrice) {
-                    console.log(symbol + ": " + price);
+                    //console.log(symbol + ": " + price);
 
                     // kiem tra vi the
                     await binance.futuresPositionRisk({symbol: symbol}).then(async position => {
@@ -288,6 +288,7 @@ async function tick() {
                             if (orderLongId) {
                                 // kiem tra lenh long
                                 await binance.futuresOrderStatus(symbol, {orderId: `${orderLongId}`}).then(order => {
+                                    if (order.orderId)
                                     if (order.status === 'NEW') {
                                         if (positionLong === '0.000' || price < botLong) {
                                             if ((order.price - price) / range <= -2) {
@@ -319,6 +320,7 @@ async function tick() {
                             if (orderShortId) {
                                 // kiem tra lenh short
                                 await binance.futuresOrderStatus(symbol, {orderId: `${orderShortId}`}).then(order => {
+                                    if (order.orderId)
                                     if (order.status === 'NEW') {
                                         if (positionShort === '0.000' || price > topShort) {
                                             if ((price - order.price) / range <= -2) {
