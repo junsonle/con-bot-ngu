@@ -286,7 +286,7 @@ async function tick() {
                         if (price > lastPrice) {
                             let botLong = Number(position[0].entryPrice) - range * (positionLong / amount - 1) / 2;
                             // kiem tra lenh long
-                            await binance.futuresOrderStatus(symbol, {orderId: `${orderLongId}`}).then(order => {
+                            await binance.futuresOrderStatus(symbol, {orderId: `${orderLongId}`}).then(async order => {
                                 if (order.orderId)
                                     if (order.status === 'NEW') {
                                         if (positionLong === '0.000' || price < botLong) {
@@ -294,30 +294,30 @@ async function tick() {
                                                 // dong lenh long
                                                 binance.futuresCancel(symbol, {orderId: `${orderLongId}`});
                                                 // mo lenh long
-                                                openLong(Math.round(price) - range, amount);
+                                                await openLong(Math.round(price) - range, amount);
                                             }
                                         } else if (order.price < Math.floor(botLong) - range) {
                                             // dong lenh long
                                             binance.futuresCancel(symbol, {orderId: `${orderLongId}`});
                                             // mo lenh long
-                                            openLong(Math.round(botLong) - range, amount);
+                                            await openLong(Math.round(botLong) - range, amount);
                                         }
                                     } else {
                                         // mo lenh long
-                                        openLong(Math.round(Math.min(price, order.price)) - range, amount);
+                                        await openLong(Math.round(Math.min(price, order.price)) - range, amount);
                                     }
                                 else if (positionLong === '0.000' || botLong > price) {
                                     // mo lenh long
-                                    openLong(Math.round(price) - range, amount);
+                                    await openLong(Math.round(price) - range, amount);
                                 } else {
                                     // mo lenh long
-                                    openLong(Math.round(botLong) - range, amount);
+                                    await openLong(Math.round(botLong) - range, amount);
                                 }
                             });
                         } else {
                             let topShort = Number(position[1].entryPrice) + range * (positionShort / -amount - 1) / 2;
                             // kiem tra lenh short
-                            await binance.futuresOrderStatus(symbol, {orderId: `${orderShortId}`}).then(order => {
+                            await binance.futuresOrderStatus(symbol, {orderId: `${orderShortId}`}).then(async order => {
                                 if (order.orderId)
                                     if (order.status === 'NEW') {
                                         if (positionShort === '0.000' || price > topShort) {
@@ -325,24 +325,24 @@ async function tick() {
                                                 // dong lenh short
                                                 binance.futuresCancel(symbol, {orderId: `${orderShortId}`});
                                                 // mo lenh short
-                                                openShort(Math.round(price) + range, amount);
+                                                await openShort(Math.round(price) + range, amount);
                                             }
                                         } else if (order.price > Math.ceil(topShort) + range) {
                                             // dong lenh short
                                             binance.futuresCancel(symbol, {orderId: `${orderShortId}`});
                                             // mo lenh short
-                                            openShort(Math.round(topShort) + range, amount);
+                                            await openShort(Math.round(topShort) + range, amount);
                                         }
                                     } else {
                                         // mo lenh short
-                                        openShort(Math.round(Math.max(price, order.price)) + range, amount);
+                                        await openShort(Math.round(Math.max(price, order.price)) + range, amount);
                                     }
                                 else if (positionShort === '0.000' || price > topShort) {
                                     // mo lenh short
-                                    openShort(Math.round(price) + range, amount);
+                                    await openShort(Math.round(price) + range, amount);
                                 } else {
                                     // mo lenh short
-                                    openShort(Math.round(topShort) + range, amount);
+                                    await openShort(Math.round(topShort) + range, amount);
                                 }
                             });
                         }

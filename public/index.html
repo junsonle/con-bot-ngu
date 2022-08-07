@@ -98,6 +98,7 @@
 
         socket.on("balance", function (data) {
             document.title = data;
+            $("#balance").text(data);
         });
 
         socket.on("listMess", function (data) {
@@ -132,6 +133,15 @@
                 }
             });
 
+            $("#clear").click(function () {
+                chat({value: 'clear', userId: socket.id, time: new Date().toLocaleString()});
+                socket.emit("clientSendMessage", {
+                    value: 'clear',
+                    userId: socket.id,
+                    time: new Date().toLocaleString()
+                });
+            });
+
             $("#message").on('keypress', function (e) {
                 if (e.which === 13) {
                     $("#chat").click();
@@ -164,8 +174,10 @@
         <br/>
         <!--        <label>ON/OFF: </label>-->
         <input id="run" type="button" value="OFF" name="run"/>
+        <input id="clear" type="button" value="CLEAR" name="clear"/>
     </form>
 </div>
+<div id="balance"></div><br>
 <div align="center">
     <input id="message" type="text" name="mess" placeholder="message"/>
     <input id="chat" type="button" value="send" name="chat"/><br>
