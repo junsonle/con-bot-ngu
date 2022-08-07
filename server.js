@@ -40,7 +40,7 @@ const binance = new Binance().options({
 
 const ping = new Monitor({
     website: 'https://con-bot-ngu.herokuapp.com',
-    interval: 10 // minutes
+    interval: 20 // minutes
 });
 
 var run = false;
@@ -194,32 +194,34 @@ io.on('connect', function (socket) {
     });
 
     socket.on('run', function (data) {
-        // postgres.query(`update config
-        //                 set run=${data.run}, amount=${data.amount}, range=${data.range};`, (err, res) => {
-        //     if (err) throw err;
-        run = data.run;
-        symbol = data.symbol;
-        amount = Number(data.amount);
-        range = Number(data.range);
+        postgres.query(`update config
+                        set run=${data.run},
+                            amount=${data.amount},
+                            range=${data.range};`, (err, res) => {
+            if (err) throw err;
+            run = data.run;
+            symbol = data.symbol;
+            amount = Number(data.amount);
+            range = Number(data.range);
 
         if (run)
             ping.restart();
         else
             ping.stop();
 
-        console.log('Config: ', data);
-        console.log("Trade " + (run ? 'on' : 'off'));
-        socket.emit("configs", data);
-        serverSendMessage("Trade " + (run ? 'on' : 'off'));
-        binance.futuresBalance().then(values => {
-            let mess = '';
-            for (let value of values) {
-                mess += `${value.asset}: ${value.balance}  ${value.crossUnPnl}<br/>`;
-            }
-            serverSendMessage(mess);
+            console.log('Config: ', data);
+            console.log("Trade " + (run ? 'on' : 'off'));
+            socket.emit("configs", data);
+            serverSendMessage("Trade " + (run ? 'on' : 'off'));
+            binance.futuresBalance().then(values => {
+                let mess = '';
+                for (let value of values) {
+                    mess += `${value.asset}: ${value.balance}  ${value.crossUnPnl}<br/>`;
+                }
+                serverSendMessage(mess);
+            });
+            tick();
         });
-        tick();
-        // });
     });
 
     socket.on('disconnect', function () {
@@ -263,9 +265,8 @@ async function tick() {
                             else
                                 // dong lenh close long
                                 binance.futuresCancel(symbol, {orderId: `${closeLongId}`}).then(value => {
-                                    if (value.status === 'CANCELED')
-                                        // mo lenh close long
-                                        openCloseLong(Math.ceil(position[0].entryPrice) + range, position[0].positionAmt);
+                                    // mo lenh close long
+                                    openCloseLong(Math.ceil(position[0].entryPrice) + range, position[0].positionAmt);
                                 });
                         }
                         positionLong = position[0].positionAmt;
@@ -276,19 +277,17 @@ async function tick() {
                             else
                                 // dong lenh close short
                                 binance.futuresCancel(symbol, {orderId: `${closeShortId}`}).then(value => {
-                                    if (value.status === 'CANCELED')
-                                        // mo lenh close short
-                                        openCloseShort(Math.floor(position[1].entryPrice) - range, position[1].positionAmt);
+                                    // mo lenh close short
+                                    openCloseShort(Math.floor(position[1].entryPrice) - range, position[1].positionAmt);
                                 });
                         }
                         positionShort = position[1].positionAmt;
 
                         if (price > lastPrice) {
                             let botLong = Number(position[0].entryPrice) - range * (positionLong / amount - 1) / 2;
-                            if (orderLongId) {
-                                // kiem tra lenh long
-                                await binance.futuresOrderStatus(symbol, {orderId: `${orderLongId}`}).then(order => {
-                                    if (order.orderId)
+                            // kiem tra lenh long
+                            await binance.futuresOrderStatus(symbol, {orderId: `${orderLongId}`}).then(order => {
+                                if (order.orderId)
                                     if (order.status === 'NEW') {
                                         if (positionLong === '0.000' || price < botLong) {
                                             if ((order.price - price) / range <= -2) {
@@ -307,20 +306,19 @@ async function tick() {
                                         // mo lenh long
                                         openLong(Math.round(Math.min(price, order.price)) - range, amount);
                                     }
-                                });
-                            } else if (positionLong === '0.000' || botLong > price) {
-                                // mo lenh long
-                                openLong(Math.round(price) - range, amount);
-                            } else {
-                                // mo lenh long
-                                openLong(Math.round(botLong) - range, amount);
-                            }
+                                else if (positionLong === '0.000' || botLong > price) {
+                                    // mo lenh long
+                                    openLong(Math.round(price) - range, amount);
+                                } else {
+                                    // mo lenh long
+                                    openLong(Math.round(botLong) - range, amount);
+                                }
+                            });
                         } else {
                             let topShort = Number(position[1].entryPrice) + range * (positionShort / -amount - 1) / 2;
-                            if (orderShortId) {
-                                // kiem tra lenh short
-                                await binance.futuresOrderStatus(symbol, {orderId: `${orderShortId}`}).then(order => {
-                                    if (order.orderId)
+                            // kiem tra lenh short
+                            await binance.futuresOrderStatus(symbol, {orderId: `${orderShortId}`}).then(order => {
+                                if (order.orderId)
                                     if (order.status === 'NEW') {
                                         if (positionShort === '0.000' || price > topShort) {
                                             if ((price - order.price) / range <= -2) {
@@ -339,14 +337,14 @@ async function tick() {
                                         // mo lenh short
                                         openShort(Math.round(Math.max(price, order.price)) + range, amount);
                                     }
-                                });
-                            } else if (positionShort === '0.000' || price > topShort) {
-                                // mo lenh short
-                                openShort(Math.round(price) + range, amount);
-                            } else {
-                                // mo lenh short
-                                openShort(Math.round(topShort) + range, amount);
-                            }
+                                else if (positionShort === '0.000' || price > topShort) {
+                                    // mo lenh short
+                                    openShort(Math.round(price) + range, amount);
+                                } else {
+                                    // mo lenh short
+                                    openShort(Math.round(topShort) + range, amount);
+                                }
+                            });
                         }
                     });
 
