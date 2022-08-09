@@ -10,15 +10,8 @@ var io = require("socket.io")(server0);
 app.io = io;
 
 const binance = new Binance().options({
-    APIKEY: '0b38ce7ec75f99cf6e98e013637c8ec7c7bcfcc10a39190fc4bde8f5419ba39d',
-    APISECRET: '152d54c08d961cb72fce5348968452c4fc5034b140e9417e51859af8a6ac00e3',
-    useServerTime: true,
-    test: true,
-    urls: {
-        base: 'https://testnet.binance.vision/api/', // remove this to trade on mainnet
-        combineStream: 'wss://testnet.binance.vision/stream?streams=',
-        stream: 'wss://testnet.binance.vision/ws/'
-    },
+    APIKEY: 'qOEo1dShWcyPpWLjQoXtnrDOs4CWl1jIraojtdySSMIKHEhDQKsAKxe9kkOLvQb2',
+    APISECRET: 'kc7oXwBFGjG5mDv2vPns9MufcBqn1DwtC2gFTF8bqCFBzVz5u1UyBM4Q0gGo6T5L',
 });
 
 var btcPricePoint = 0;
@@ -144,7 +137,7 @@ async function startOrders(price) {
 
 async function main() {
 
-    //console.info( await binance.futuresBalance() );
+    console.info( await binance.futuresBalance() );
 
     //`${}`
 
@@ -159,54 +152,54 @@ async function main() {
 
     //orders = await binance.futuresOpenOrders(symbol);
 
-    await binance.futuresPositionRisk({symbol: symbol}).then(value => {
-        positionLong = value[0].positionAmt;
-        positionShort = value[1].positionAmt;
-    });
+    // await binance.futuresPositionRisk({symbol: symbol}).then(value => {
+    //     positionLong = value[0].positionAmt;
+    //     positionShort = value[1].positionAmt;
+    // });
 
     // await binance.futuresMiniTickerStream(symbol, async (data) => {
     //     if (data.close !== lastPrice) {
     //         console.log(symbol + ": " + Number(data.close));
     //         // dat lenh dong vi the
-    //         binance.futuresPositionRisk({symbol: symbol}).then(async value => {
-    //             if (value[0].positionAmt !== positionLong) {
-    //                 if (value[0].positionAmt !== '0.000') {
-    //                     if (positionLong !== '0.000')
-    //                         // dong lenh close long
-    //                         await binance.futuresCancel(symbol, {orderId: `${orderCloseLong.orderId}`});
-    //                     // mo lenh close long
-    //                     await openCloseLong(Number(value[0].entryPrice) + biendo, Number(value[0].positionAmt));
-    //                 }
-    //                 positionLong = value[0].positionAmt;
-    //             }
-    //             if (value[1].positionAmt !== positionShort) {
-    //                 if (value[1].positionAmt !== '0.000') {
-    //                     if (positionShort !== '0.000')
-    //                         // dong lenh close short
-    //                         await binance.futuresCancel(symbol, {orderId: `${orderCloseShort.orderId}`});
-    //                     // mo lenh close short
-    //                     await openCloseShort(Number(value[1].entryPrice) - biendo, Number(value[1].positionAmt));
-    //                 }
-    //                 positionShort = value[1].positionAmt;
-    //             }
-    //         });
-    //         let fromPrice = data.close > lastPrice ? lastPrice : data.close;
-    //         let toPrice = data.close < lastPrice ? lastPrice : data.close;
-    //
-    //         await orders.filter(order => order.price >= fromPrice && order.price <= toPrice).forEach((order, index) => {
-    //             // console.log("VAO LENH ");
-    //             // console.log(order);
-    //             if (order.side === 'BUY') {
-    //                 if(orders.filter(value => Number(value.price) === Number(order.price) + biendo).length === 0)
-    //                     // mo lenh short
-    //                     openShort(Number(order.price) + biendo, 1, true);
-    //             } else {
-    //                 if(orders.filter(value => Number(value.price) === Number(order.price) - biendo).length === 0)
-    //                     // mo lenh long
-    //                     openLong(Number(order.price) - biendo, 1, true);
-    //             }
-    //             orders.splice(index, 1);
-    //         });
+    //         // binance.futuresPositionRisk({symbol: symbol}).then(async value => {
+    //         //     if (value[0].positionAmt !== positionLong) {
+    //         //         if (value[0].positionAmt !== '0.000') {
+    //         //             if (positionLong !== '0.000')
+    //         //                 // dong lenh close long
+    //         //                 await binance.futuresCancel(symbol, {orderId: `${orderCloseLong.orderId}`});
+    //         //             // mo lenh close long
+    //         //             await openCloseLong(Number(value[0].entryPrice) + biendo, Number(value[0].positionAmt));
+    //         //         }
+    //         //         positionLong = value[0].positionAmt;
+    //         //     }
+    //         //     if (value[1].positionAmt !== positionShort) {
+    //         //         if (value[1].positionAmt !== '0.000') {
+    //         //             if (positionShort !== '0.000')
+    //         //                 // dong lenh close short
+    //         //                 await binance.futuresCancel(symbol, {orderId: `${orderCloseShort.orderId}`});
+    //         //             // mo lenh close short
+    //         //             await openCloseShort(Number(value[1].entryPrice) - biendo, Number(value[1].positionAmt));
+    //         //         }
+    //         //         positionShort = value[1].positionAmt;
+    //         //     }
+    //         // });
+    //         // let fromPrice = data.close > lastPrice ? lastPrice : data.close;
+    //         // let toPrice = data.close < lastPrice ? lastPrice : data.close;
+    //         //
+    //         // await orders.filter(order => order.price >= fromPrice && order.price <= toPrice).forEach((order, index) => {
+    //         //     // console.log("VAO LENH ");
+    //         //     // console.log(order);
+    //         //     if (order.side === 'BUY') {
+    //         //         if(orders.filter(value => Number(value.price) === Number(order.price) + biendo).length === 0)
+    //         //             // mo lenh short
+    //         //             openShort(Number(order.price) + biendo, 1, true);
+    //         //     } else {
+    //         //         if(orders.filter(value => Number(value.price) === Number(order.price) - biendo).length === 0)
+    //         //             // mo lenh long
+    //         //             openLong(Number(order.price) - biendo, 1, true);
+    //         //     }
+    //         //     orders.splice(index, 1);
+    //         // });
     //         lastPrice = data.close;
     //     }
     // });
@@ -214,41 +207,41 @@ async function main() {
     let fromPrice;
     let toPrice;
 
-    await binance.futuresMarkPriceStream('BTCUSDT', (data) => {
-        console.log(data.markPrice);
-        fromPrice = data.markPrice > lastPrice ? lastPrice : data.markPrice;
-        toPrice = data.markPrice < lastPrice ? lastPrice : data.markPrice;
-
-
-
-        // Math.round(data.markPrice);
-
-        // if(data.markPrice - btcPrice > 0) {
-        //     if(giam < 0)
-        //         giam = 0;
-        //     tang += data.markPrice - btcPrice;
-        //     if(tang > tangMax) {
-        //         tangMax = tang;
-        //         console.log(`Tang max: ${tangMax}`);
-        //     }
-        // } else if(data.markPrice - btcPrice < 0) {
-        //     if(tang > 0)
-        //         tang = 0;
-        //     giam += data.markPrice - btcPrice;
-        //     if(giam < giamMax) {
-        //         giamMax = giam;
-        //         console.log(`Giam max: ${giamMax}`);
-        //     }
-        // }
-
-        //console.log(`Chenh lech: ${data.markPrice - btcPrice}`);
-        // if (Math.abs(data.markPrice - btcPrice) > btcPricePoint) {
-        //     btcPricePoint = Math.abs(data.markPrice - btcPrice);
-        //     console.log(`Chenh lech max: ${btcPricePoint}`);
-        // }
-        //btcPrice = data.markPrice;
-        lastPrice = data.markPrice;
-    });
+    // await binance.futuresMarkPriceStream('BTCUSDT', (data) => {
+    //     console.log(data.markPrice);
+    //     fromPrice = data.markPrice > lastPrice ? lastPrice : data.markPrice;
+    //     toPrice = data.markPrice < lastPrice ? lastPrice : data.markPrice;
+    //
+    //
+    //
+    //     // Math.round(data.markPrice);
+    //
+    //     // if(data.markPrice - btcPrice > 0) {
+    //     //     if(giam < 0)
+    //     //         giam = 0;
+    //     //     tang += data.markPrice - btcPrice;
+    //     //     if(tang > tangMax) {
+    //     //         tangMax = tang;
+    //     //         console.log(`Tang max: ${tangMax}`);
+    //     //     }
+    //     // } else if(data.markPrice - btcPrice < 0) {
+    //     //     if(tang > 0)
+    //     //         tang = 0;
+    //     //     giam += data.markPrice - btcPrice;
+    //     //     if(giam < giamMax) {
+    //     //         giamMax = giam;
+    //     //         console.log(`Giam max: ${giamMax}`);
+    //     //     }
+    //     // }
+    //
+    //     //console.log(`Chenh lech: ${data.markPrice - btcPrice}`);
+    //     // if (Math.abs(data.markPrice - btcPrice) > btcPricePoint) {
+    //     //     btcPricePoint = Math.abs(data.markPrice - btcPrice);
+    //     //     console.log(`Chenh lech max: ${btcPricePoint}`);
+    //     // }
+    //     //btcPrice = data.markPrice;
+    //     lastPrice = data.markPrice;
+    // });
 
     //console.log(symbol + ": " + Math.round((btcPricePoint / 10)) * 10);
 
@@ -259,7 +252,7 @@ async function main() {
     //console.log(map);
     //console.log(map.get(Math.round((lowPrice))));
 
-    //console.info(await binance.futuresPositionRisk({symbol: symbol}));
+    console.info(await binance.futuresPositionRisk({symbol: symbol}));
     //console.info( await binance.futuresPositionMargin(symbol, amount) );
     //console.info( await binance.futuresTrades( symbol ) );
     // console.info( await binance.futuresAggTrades( "XTZUSDT" ) );

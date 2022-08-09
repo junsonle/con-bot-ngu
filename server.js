@@ -10,38 +10,38 @@ app.use(Express.static("./public"));
 const port = process.env.PORT;
 server.listen(port || 3000);
 
-const postgres = new Client({
-    user: 'bznnfglwutbcjf',
-    host: 'ec2-3-229-252-6.compute-1.amazonaws.com',
-    database: 'dcisecurskg7nf',
-    password: '58acdda7669a5493ae9d51f3751a4e5fefbbc592257e3383c2f716283042b186',
-    port: 5432,
-    ssl: {
-        rejectUnauthorized: false
-    }
-});
-
-postgres.connect(function (err) {
-    if (err) throw err;
-    console.log("Connected Postgres Database!");
-});
+// const postgres = new Client({
+//     user: 'bznnfglwutbcjf',
+//     host: 'ec2-3-229-252-6.compute-1.amazonaws.com',
+//     database: 'dcisecurskg7nf',
+//     password: '58acdda7669a5493ae9d51f3751a4e5fefbbc592257e3383c2f716283042b186',
+//     port: 5432,
+//     ssl: {
+//         rejectUnauthorized: false
+//     }
+// });
+//
+// postgres.connect(function (err) {
+//     if (err) throw err;
+//     console.log("Connected Postgres Database!");
+// });
 
 const binance = new Binance().options({
-    APIKEY: 'qOEo1dShWcyPpWLjQoXtnrDOs4CWl1jIraojtdySSMIKHEhDQKsAKxe9kkOLvQb2',
-    APISECRET: 'kc7oXwBFGjG5mDv2vPns9MufcBqn1DwtC2gFTF8bqCFBzVz5u1UyBM4Q0gGo6T5L',
-    // useServerTime: true,
-    // test: true,
-    // urls: {
-    //     base: 'https://testnet.binance.vision/api/', // remove this to trade on mainnet
-    //     combineStream: 'wss://testnet.binance.vision/stream?streams=',
-    //     stream: 'wss://testnet.binance.vision/ws/'
-    // },
+    APIKEY: '0b38ce7ec75f99cf6e98e013637c8ec7c7bcfcc10a39190fc4bde8f5419ba39d',
+    APISECRET: '152d54c08d961cb72fce5348968452c4fc5034b140e9417e51859af8a6ac00e3',
+    useServerTime: true,
+    test: true,
+    urls: {
+        base: 'https://testnet.binance.vision/api/', // remove this to trade on mainnet
+        combineStream: 'wss://testnet.binance.vision/stream?streams=',
+        stream: 'wss://testnet.binance.vision/ws/'
+    },
 });
 
-const ping = new Monitor({
-    website: 'https://con-bot-ngu.herokuapp.com',
-    interval: 20 // minutes
-});
+// const ping = new Monitor({
+//     website: 'https://con-bot-ngu.herokuapp.com',
+//     interval: 20 // minutes
+// });
 
 var run = false;
 var symbol = 'BTCBUSD';
@@ -179,7 +179,7 @@ io.on('connect', function (socket) {
         } else if (data.value === 'balance') {
             binance.futuresBalance().then(values => {
                 let mess = '';
-                for (let value of values) {
+                for (let value of values.filter(f => f.balance != 0)) {
                     mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl}<br/>`;
                 }
                 serverSendMessage(mess);
@@ -194,20 +194,20 @@ io.on('connect', function (socket) {
     });
 
     socket.on('run', function (data) {
-        postgres.query(`update config
-                        set run=${data.run},
-                            amount=${data.amount},
-                            range=${data.range};`, (err, res) => {
-            if (err) throw err;
+        // postgres.query(`update config
+        //                 set run=${data.run},
+        //                     amount=${data.amount},
+        //                     range=${data.range};`, (err, res) => {
+        //     if (err) throw err;
             run = data.run;
             symbol = data.symbol;
             amount = Number(data.amount);
             range = Number(data.range);
 
-        if (run)
-            ping.restart();
-        else
-            ping.stop();
+            // if (run)
+            //     ping.restart();
+            // else
+            //     ping.stop();
 
             console.log('Config: ', data);
             console.log("Trade " + (run ? 'on' : 'off'));
@@ -221,7 +221,7 @@ io.on('connect', function (socket) {
                 serverSendMessage(mess);
             });
             tick();
-        });
+        // });
     });
 
     socket.on('disconnect', function () {
@@ -236,13 +236,13 @@ app.get("/", function (req, res) {
 
 app.get('/robot.png', (req, res) => res.status(200));
 
-ping.on('up', function (res, state) {
-    console.log('Service is up');
-});
+// ping.on('up', function (res, state) {
+//     console.log('Service is up');
+// });
 
-ping.on('stop', function (res, state) {
-    console.log('Service is stop');
-});
+// ping.on('stop', function (res, state) {
+//     console.log('Service is stop');
+// });
 
 async function tick() {
     let lastPrice = 0;
@@ -360,40 +360,45 @@ async function tick() {
 
 async function main() {
 
-    await postgres.query('select * from config;', (err, res) => {
-        if (err) throw err;
-        run = res.rows[0].run;
-        symbol = res.rows[0].symbol;
-        amount = res.rows[0].amount;
-        range = res.rows[0].range;
-        if (run) {
-            // dong tat ca cac lenh
-            binance.futuresCancelAll(symbol).then(value => {
-                if (value.code === 200) {
-                    //listMess = [];
-                    orderLongId = orderShortId = closeLongId = closeShortId = null;
-
-                    console.log("Trade " + (run ? 'on' : 'off'));
-                    serverSendMessage("Trade " + (run ? 'on' : 'off'));
-                    binance.futuresBalance().then(values => {
-                        let mess = '';
-                        for (let value of values) {
-                            mess += `${value.asset}: ${value.balance}  ${value.crossUnPnl}<br/>`;
-                        }
-                        serverSendMessage(mess);
-                    });
-                    tick();
-                }
-            });
-        } else
-            ping.stop;
-    });
+    // await postgres.query('select * from config;', (err, res) => {
+    //     if (err) throw err;
+    //     run = res.rows[0].run;
+    //     symbol = res.rows[0].symbol;
+    //     amount = res.rows[0].amount;
+    //     range = res.rows[0].range;
+    //     if (run) {
+    //         // dong tat ca cac lenh
+    //         binance.futuresCancelAll(symbol).then(value => {
+    //             if (value.code === 200) {
+    //                 //listMess = [];
+    //                 orderLongId = orderShortId = closeLongId = closeShortId = null;
+    //
+    //                 console.log("Trade " + (run ? 'on' : 'off'));
+    //                 serverSendMessage("Trade " + (run ? 'on' : 'off'));
+    //                 binance.futuresBalance().then(values => {
+    //                     let mess = '';
+    //                     for (let value of values) {
+    //                         mess += `${value.asset}: ${value.balance}  ${value.crossUnPnl}<br/>`;
+    //                     }
+    //                     serverSendMessage(mess);
+    //                 });
+    //                 tick();
+    //             }
+    //         });
+    //     } else
+    //         ping.stop;
+    // });
 
     binance.futuresMiniTickerStream(symbol, data => {
         //console.log(data.close);
         io.emit("price", `${symbol}: ${data.close}`);
         binance.futuresBalance().then(values => {
-            io.emit("balance", `${Number(values[9].balance).toFixed(2)} ${values[9].crossUnPnl > 0 ? '+' : ''}${Number(values[9].crossUnPnl).toFixed(2)} | BUSD`);
+            io.emit("balance", `${Number(values[2].balance).toFixed(2)} ${values[2].crossUnPnl > 0 ? '+' : ''}${Number(values[2].crossUnPnl).toFixed(2)} | BUSD`);
+        });
+        binance.futuresPositionRisk({symbol: symbol}).then(position => {
+            position.forEach(data => {
+                serverSendMessage(`${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
+            });
         });
     });
 
