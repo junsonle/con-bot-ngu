@@ -194,10 +194,10 @@ io.on('connect', function (socket) {
             amount = Number(data.amount);
             range = Number(data.range);
 
-        if (run)
-            ping.restart();
-        else
-            ping.stop();
+            if (run)
+                ping.restart();
+            else
+                ping.stop();
 
             console.log('Config: ', data);
             console.log("Trade " + (run ? 'on' : 'off'));
@@ -282,15 +282,19 @@ async function tick() {
                                         if (positionLong === '0.000' || price < botLong) {
                                             if ((order.price - price) / range <= -2) {
                                                 // dong lenh long
-                                                binance.futuresCancel(symbol, {orderId: `${orderLongId}`});
-                                                // mo lenh long
-                                                await openLong(Math.round(price) - range, amount);
+                                                await binance.futuresCancel(symbol, {orderId: `${orderLongId}`}).then(value => {
+                                                    if (value.status === 'CANCELED')
+                                                        // mo lenh long
+                                                        openLong(Math.round(price) - range, amount);
+                                                });
                                             }
                                         } else if (order.price < Math.floor(botLong) - range) {
                                             // dong lenh long
-                                            binance.futuresCancel(symbol, {orderId: `${orderLongId}`});
-                                            // mo lenh long
-                                            await openLong(Math.round(botLong) - range, amount);
+                                            await binance.futuresCancel(symbol, {orderId: `${orderLongId}`}).then(value => {
+                                                if (value.status === 'CANCELED')
+                                                    // mo lenh long
+                                                    openLong(Math.round(botLong) - range, amount);
+                                            });
                                         }
                                     } else {
                                         // mo lenh long
@@ -313,15 +317,19 @@ async function tick() {
                                         if (positionShort === '0.000' || price > topShort) {
                                             if ((price - order.price) / range <= -2) {
                                                 // dong lenh short
-                                                binance.futuresCancel(symbol, {orderId: `${orderShortId}`});
-                                                // mo lenh short
-                                                await openShort(Math.round(price) + range, amount);
+                                                binance.futuresCancel(symbol, {orderId: `${orderShortId}`}).then(value => {
+                                                    if (value.status === 'CANCELED')
+                                                        // mo lenh short
+                                                        openShort(Math.round(price) + range, amount);
+                                                });
                                             }
                                         } else if (order.price > Math.ceil(topShort) + range) {
                                             // dong lenh short
-                                            binance.futuresCancel(symbol, {orderId: `${orderShortId}`});
-                                            // mo lenh short
-                                            await openShort(Math.round(topShort) + range, amount);
+                                            binance.futuresCancel(symbol, {orderId: `${orderShortId}`}).then(value => {
+                                                if (value.status === 'CANCELED')
+                                                    // mo lenh short
+                                                    openShort(Math.round(topShort) + range, amount);
+                                            });
                                         }
                                     } else {
                                         // mo lenh short
