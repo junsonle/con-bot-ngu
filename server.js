@@ -28,14 +28,7 @@ postgres.connect(function (err) {
 
 const binance = new Binance().options({
     APIKEY: 'qOEo1dShWcyPpWLjQoXtnrDOs4CWl1jIraojtdySSMIKHEhDQKsAKxe9kkOLvQb2',
-    APISECRET: 'kc7oXwBFGjG5mDv2vPns9MufcBqn1DwtC2gFTF8bqCFBzVz5u1UyBM4Q0gGo6T5L',
-    // useServerTime: true,
-    // test: true,
-    // urls: {
-    //     base: 'https://testnet.binance.vision/api/', // remove this to trade on mainnet
-    //     combineStream: 'wss://testnet.binance.vision/stream?streams=',
-    //     stream: 'wss://testnet.binance.vision/ws/'
-    // },
+    APISECRET: 'kc7oXwBFGjG5mDv2vPns9MufcBqn1DwtC2gFTF8bqCFBzVz5u1UyBM4Q0gGo6T5L'
 });
 
 const ping = new Monitor({
@@ -43,12 +36,12 @@ const ping = new Monitor({
     interval: 20 // minutes
 });
 
-var run = false;
-var symbol = 'BTCBUSD';
-var amount = 0.001;
-var range = 20;
+let run = false;
+let symbol = 'BTCBUSD';
+let amount = 0.001;
+let range = 20;
 
-var listMess = [];
+let listMess = [];
 
 let orderLongId;
 let orderShortId;
@@ -179,7 +172,7 @@ io.on('connect', function (socket) {
         } else if (data.value === 'balance') {
             binance.futuresBalance().then(values => {
                 let mess = '';
-                for (let value of values) {
+                for (let value of values.filter(f => f.balance != 0)) {
                     mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl}<br/>`;
                 }
                 serverSendMessage(mess);
@@ -194,10 +187,7 @@ io.on('connect', function (socket) {
     });
 
     socket.on('run', function (data) {
-        postgres.query(`update config
-                        set run=${data.run},
-                            amount=${data.amount},
-                            range=${data.range};`, (err, res) => {
+        postgres.query(`update config set run=${data.run}, amount=${data.amount}, range=${data.range} where id = 1;`, (err, res) => {
             if (err) throw err;
             run = data.run;
             symbol = data.symbol;
@@ -360,7 +350,7 @@ async function tick() {
 
 async function main() {
 
-    await postgres.query('select * from config;', (err, res) => {
+    await postgres.query('select * from config where id = 1;', (err, res) => {
         if (err) throw err;
         run = res.rows[0].run;
         symbol = res.rows[0].symbol;
