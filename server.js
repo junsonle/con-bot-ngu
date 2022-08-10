@@ -141,6 +141,16 @@ function serverSendMessage(message) {
     listMess.push(mess);
 }
 
+function serverSendBalance() {
+    binance.futuresBalance().then(values => {
+        let mess = '';
+        for (let value of values.filter(f => f.balance != 0)) {
+            mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl}<br/>`;
+        }
+        serverSendMessage(mess);
+    });
+}
+
 io.on('connect', function (socket) {
 
     console.log(socket.id + " Da ket noi!");
@@ -177,13 +187,7 @@ io.on('connect', function (socket) {
                 });
             });
         } else if (data.value === 'balance') {
-            binance.futuresBalance().then(values => {
-                let mess = '';
-                for (let value of values.filter(f => f.balance != 0)) {
-                    mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl}<br/>`;
-                }
-                serverSendMessage(mess);
-            });
+            serverSendBalance();
         } else if (data.value === 'position') {
             binance.futuresPositionRisk({symbol: symbol}).then(position => {
                 position.forEach(data => {
@@ -210,7 +214,7 @@ io.on('connect', function (socket) {
             console.log("Trade " + (run ? 'on' : 'off'));
             socket.emit("configs", data);
             serverSendMessage("Trade " + (run ? 'on' : 'off'));
-            io.emit("clientSendMessage", 'balance');
+            serverSendBalance();
             tick();
         });
     });
@@ -363,10 +367,9 @@ async function main() {
                 if (value.code === 200) {
                     //listMess = [];
                     orderLongId = orderShortId = closeLongId = closeShortId = null;
-
                     console.log("Trade " + (run ? 'on' : 'off'));
                     serverSendMessage("Trade " + (run ? 'on' : 'off'));
-                    io.emit("clientSendMessage", 'balance');
+                    serverSendBalance();
                     tick();
                 }
             });
