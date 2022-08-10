@@ -210,13 +210,7 @@ io.on('connect', function (socket) {
             console.log("Trade " + (run ? 'on' : 'off'));
             socket.emit("configs", data);
             serverSendMessage("Trade " + (run ? 'on' : 'off'));
-            binance.futuresBalance().then(values => {
-                let mess = '';
-                for (let value of values) {
-                    mess += `${value.asset}: ${value.balance}  ${value.crossUnPnl}<br/>`;
-                }
-                serverSendMessage(mess);
-            });
+            io.emit("clientSendMessage", 'balance');
             tick();
         });
     });
@@ -372,13 +366,7 @@ async function main() {
 
                     console.log("Trade " + (run ? 'on' : 'off'));
                     serverSendMessage("Trade " + (run ? 'on' : 'off'));
-                    binance.futuresBalance().then(values => {
-                        let mess = '';
-                        for (let value of values) {
-                            mess += `${value.asset}: ${value.balance}  ${value.crossUnPnl}<br/>`;
-                        }
-                        serverSendMessage(mess);
-                    });
+                    io.emit("clientSendMessage", 'balance');
                     tick();
                 }
             });
