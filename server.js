@@ -375,7 +375,7 @@ async function main() {
             ping.stop;
     });
 
-    binance.futuresMiniTickerStream(symbol, data => {
+    binance.futuresMiniTickerStream(configs.symbol, data => {
         //console.log(data.close);
         io.emit("price", `${configs.symbol}: ${data.close}`);
         binance.futuresBalance().then(values => {
