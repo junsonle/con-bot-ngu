@@ -202,7 +202,7 @@ io.on('connect', function (socket) {
             configs.amount = Number(data.amount);
             configs.range = Number(data.range);
 
-            if (run)
+            if (configs.run)
                 ping.restart();
             else
                 ping.stop();
