@@ -49,6 +49,8 @@ let listMess = [];
 
 let orderLongId;
 let orderShortId;
+let orderLongMId;
+let orderShortMId;
 let closeLongId;
 let closeShortId;
 
@@ -101,9 +103,21 @@ async function openShort(price, amount) {
             price: `${price}`,
             timeInForce: "GTX",
             newOrderRespType: "ACK"
+        },
+        {   // mo lenh long
+            symbol: configs.symbol,
+            side: "BUY",
+            type: "STOP_MARKET",
+            quantity: `${amount}`,
+            positionSide: "LONG",
+            //price: `${price}`,
+            //timeInForce: "GTX",
+            stopPrice: `${price+1}`,
+            newOrderRespType: "ACK"
         }
     ]).then((data) => {
         orderShortId = data[0].orderId;
+        orderLongMId = data[1].orderId;
         console.log("MO LENH SHORT");
         //console.log(data[0]);
     }).catch(console.log);
@@ -120,9 +134,21 @@ async function openLong(price, amount) {
             price: `${price}`,
             timeInForce: "GTX",
             newOrderRespType: "ACK"
+        },
+        {   // mo lenh short
+            symbol: configs.symbol,
+            side: "SELL",
+            type: "STOP_MARKET",
+            quantity: `${amount}`,
+            positionSide: "SHORT",
+            //price: `${price}`,
+            //timeInForce: "GTX",
+            stopPrice: `${price-1}`,
+            newOrderRespType: "ACK"
         }
     ]).then((data) => {
         orderLongId = data[0].orderId;
+        orderShortMId = data[1].orderId;
         console.log("MO LENH LONG");
         //console.log(data[0]);
     }).catch(console.log);
@@ -197,8 +223,7 @@ io.on('connect', function (socket) {
     socket.on('run', function (data) {
         postgres.query(`update config set run=${data.run}, amount=${data.amount}, range=${data.range} where id = 1;`, (err, res) => {
             if (err) throw err;
-            configs.run = data.run;
-            configs.symbol = data.symbol;
+            configs = data;
             configs.amount = Number(data.amount);
             configs.range = Number(data.range);
 
@@ -275,22 +300,27 @@ async function tick() {
                         }
                         positionShort = position[1].positionAmt;
 
-                        if (price > lastPrice && configs.sideLong) {
-                            let botLong = Number(position[0].entryPrice) - configs.range * (positionLong / configs.amount - 1) / 2;
-                            // kiem tra lenh long
-                            await binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongId}`}).then(async order => {
-                                if (order.orderId)
+                        if (price > lastPrice) {
+                            if (configs.sideLong) {
+                                let botLong = Number(position[0].entryPrice) - configs.range * (positionLong / configs.amount - 1) / 2;
+                                // kiem tra lenh long
+                                await binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongId}`}).then(async order => {
+                                if (order.orderId) {
                                     if (order.status === 'NEW') {
                                         if (positionLong === '0.000' || price < botLong) {
                                             if ((order.price - price) / configs.range <= -2) {
                                                 // dong lenh long
                                                 binance.futuresCancel(configs.symbol, {orderId: `${orderLongId}`});
+                                                // dong lenh short
+                                                binance.futuresCancel(configs.symbol, {orderId: `${orderShortMId}`});
                                                 // mo lenh long
                                                 await openLong(Math.round(price) - configs.range, configs.amount);
                                             }
                                         } else if (order.price < Math.floor(botLong) - configs.range) {
                                             // dong lenh long
                                             binance.futuresCancel(configs.symbol, {orderId: `${orderLongId}`});
+                                            // dong lenh short
+                                            binance.futuresCancel(configs.symbol, {orderId: `${orderShortMId}`});
                                             // mo lenh long
                                             await openLong(Math.round(botLong) - configs.range, configs.amount);
                                         }
@@ -298,7 +328,7 @@ async function tick() {
                                         // mo lenh long
                                         await openLong(Math.round(Math.min(price, order.price)) - configs.range, configs.amount);
                                     }
-                                else if (positionLong === '0.000' || botLong > price) {
+                                } else if (positionLong === '0.000' || botLong > price) {
                                     // mo lenh long
                                     await openLong(Math.round(price) - configs.range, configs.amount);
                                 } else {
@@ -306,6 +336,7 @@ async function tick() {
                                     await openLong(Math.round(botLong) - configs.range, configs.amount);
                                 }
                             });
+                            }
                         } else if (configs.sideShort) {
                             let topShort = Number(position[1].entryPrice) + configs.range * (positionShort / -configs.amount - 1) / 2;
                             // kiem tra lenh short
@@ -316,12 +347,16 @@ async function tick() {
                                             if ((price - order.price) / configs.range <= -2) {
                                                 // dong lenh short
                                                 binance.futuresCancel(configs.symbol, {orderId: `${orderShortId}`});
+                                                // dong lenh long
+                                                binance.futuresCancel(configs.symbol, {orderId: `${orderLongMId}`});
                                                 // mo lenh short
                                                 await openShort(Math.round(price) + configs.range, configs.amount);
                                             }
                                         } else if (order.price > Math.ceil(topShort) + configs.range) {
                                             // dong lenh short
                                             binance.futuresCancel(configs.symbol, {orderId: `${orderShortId}`});
+                                            // dong lenh long
+                                            binance.futuresCancel(configs.symbol, {orderId: `${orderLongMId}`});
                                             // mo lenh short
                                             await openShort(Math.round(topShort) + configs.range, configs.amount);
                                         }

@@ -16,6 +16,7 @@
         }
 
         body {
+            margin: 0px;
             text-align: center;
             color: white;
             background: rgb(43, 49, 58);
@@ -94,9 +95,10 @@
             $("#symbol").val(configs.symbol).prop('disabled', configs.run);
             $("#amount").val(configs.amount).prop('disabled', configs.run);
             $("#range").val(configs.range).prop('disabled', configs.run);
-            $("#run").val(!configs.run ? 'ON' : 'OFF');
             $("#sideL").prop('checked', configs.sideLong);
             $("#sideS").prop('checked', configs.sideShort);
+            $("#run").val(!configs.run ? 'ON' : 'OFF');
+            $("#on").prop("checked", configs.run);
             run = configs.run;
         });
 
@@ -177,6 +179,7 @@
 </head>
 <body>
 <div class="container">
+    <input id="on" type="radio" style="float: left; width: 15px; height: 15px"/>
     <h4 id="price" style="margin: 10px">Messenger</h4>
     <label id="balance">BUSD</label>
     <form id="form">
