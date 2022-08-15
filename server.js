@@ -112,7 +112,7 @@ async function openShort(price, amount) {
             positionSide: "LONG",
             //price: `${price}`,
             //timeInForce: "GTX",
-            stopPrice: `${price+1}`,
+            stopPrice: `${price}`,
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
@@ -143,7 +143,7 @@ async function openLong(price, amount) {
             positionSide: "SHORT",
             //price: `${price}`,
             //timeInForce: "GTX",
-            stopPrice: `${price-1}`,
+            stopPrice: `${price}`,
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
@@ -275,7 +275,7 @@ async function tick() {
 
                     // kiem tra vi the
                     await binance.futuresPositionRisk({symbol: configs.symbol}).then(async position => {
-                        if (position[0].positionAmt !== '0.000' && position[0].positionAmt !== positionLong) {
+                        if (position[0].positionAmt !== '0.000' && position[0].positionAmt !== positionLong && position[0].positionAmt >= position[1].positionAmt) {
                             if (positionLong === '0.000')
                                 // mo lenh close long
                                 openCloseLong(Math.ceil(position[0].entryPrice) + configs.range, position[0].positionAmt);
@@ -287,7 +287,7 @@ async function tick() {
                                 });
                         }
                         positionLong = position[0].positionAmt;
-                        if (position[1].positionAmt !== '0.000' && position[1].positionAmt !== positionShort) {
+                        if (position[1].positionAmt !== '0.000' && position[1].positionAmt !== positionShort && position[1].positionAmt >= position[0].positionAmt) {
                             if (positionShort === '0.000')
                                 // mo lenh close short
                                 openCloseShort(Math.floor(position[1].entryPrice) - configs.range, position[1].positionAmt);
@@ -325,6 +325,22 @@ async function tick() {
                                             await openLong(Math.round(botLong) - configs.range, configs.amount);
                                         }
                                     } else {
+                                        if (order.status === 'FILL') {
+                                            binance.futuresMultipleOrders([
+                                                {   // dong lenh short
+                                                    symbol: configs.symbol,
+                                                    side: "BUY",
+                                                    type: "LIMIT",
+                                                    quantity: `${-configs.amount}`,
+                                                    positionSide: "SHORT",
+                                                    price: `${order.price - configs.range}`,
+                                                    timeInForce: "GTC",
+                                                    newOrderRespType: "ACK"
+                                                }
+                                            ]).then((data) => {
+                                                console.log("DONG VI THE SHORT");
+                                            }).catch(console.log);
+                                        }
                                         // mo lenh long
                                         await openLong(Math.round(Math.min(price, order.price)) - configs.range, configs.amount);
                                     }
@@ -361,6 +377,22 @@ async function tick() {
                                             await openShort(Math.round(topShort) + configs.range, configs.amount);
                                         }
                                     } else {
+                                        if (order.status === 'FILL') {
+                                            binance.futuresMultipleOrders([
+                                                {   // dong lenh long
+                                                    symbol: configs.symbol,
+                                                    side: "SELL",
+                                                    type: "LIMIT",
+                                                    quantity: `${configs.amount}`,
+                                                    positionSide: "LONG",
+                                                    price: `${order.price + configs.range}`,
+                                                    timeInForce: "GTC",
+                                                    newOrderRespType: "ACK"
+                                                }
+                                            ]).then((data) => {
+                                                console.log("DONG VI THE LONG");
+                                            }).catch(console.log);
+                                        }
                                         // mo lenh short
                                         await openShort(Math.round(Math.max(price, order.price)) + configs.range, configs.amount);
                                     }
