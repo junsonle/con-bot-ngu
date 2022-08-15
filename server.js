@@ -325,7 +325,7 @@ async function tick() {
                                             await openLong(Math.round(botLong) - configs.range, configs.amount);
                                         }
                                     } else {
-                                        if (order.status === 'FILL') {
+                                        if (order.status === 'FILLED') {
                                             binance.futuresMultipleOrders([
                                                 {   // dong lenh short
                                                     symbol: configs.symbol,
@@ -377,7 +377,7 @@ async function tick() {
                                             await openShort(Math.round(topShort) + configs.range, configs.amount);
                                         }
                                     } else {
-                                        if (order.status === 'FILL') {
+                                        if (order.status === 'FILLED') {
                                             binance.futuresMultipleOrders([
                                                 {   // dong lenh long
                                                     symbol: configs.symbol,
