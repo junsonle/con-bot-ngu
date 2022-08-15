@@ -154,47 +154,6 @@ async function openLong(price, amount) {
     }).catch(console.log);
 }
 
-async function openShortM(price, amount) {
-    await binance.futuresMultipleOrders([
-        {   // mo lenh long
-            symbol: configs.symbol,
-            side: "BUY",
-            type: "STOP_MARKET",
-            quantity: `${amount}`,
-            positionSide: "LONG",
-            //price: `${price}`,
-            //timeInForce: "GTX",
-            stopPrice: `${price+1}`,
-            newOrderRespType: "ACK"
-        }
-    ]).then((data) => {
-        orderLongMId = data[0].orderId;
-        console.log("MO LENH SHORT MAKET");
-        //console.log(data[0]);
-    }).catch(console.log);
-}
-
-async function openLongM(price, amount) {
-    await binance.futuresMultipleOrders([
-        {   // mo lenh short
-            symbol: configs.symbol,
-            side: "SELL",
-            type: "STOP_MARKET",
-            quantity: `${amount}`,
-            positionSide: "SHORT",
-            //price: `${price}`,
-            //timeInForce: "GTX",
-            stopPrice: `${price-1}`,
-            newOrderRespType: "ACK"
-        }
-    ]).then((data) => {
-        orderShortMId = data[0].orderId;
-        console.log("MO LENH LONG MAKET");
-        //console.log(data[0]);
-    }).catch(console.log);
-}
-
-
 function serverSendMessage(message) {
     let mess = {
         value: message,
@@ -350,26 +309,18 @@ async function tick() {
                                     if (order.status === 'NEW') {
                                         if (positionLong === '0.000' || price < botLong) {
                                             if ((order.price - price) / configs.range <= -2) {
-                                                if (positionShort === '0.000') {
-                                                    // dong lenh short M
-                                                    binance.futuresCancel(configs.symbol, {orderId: `${orderShortMId}`});
-                                                    // mo lenh Short M
-                                                    openShortM(Math.round(price) - configs.range, configs.amount);
-                                                }
                                                 // dong lenh long
                                                 binance.futuresCancel(configs.symbol, {orderId: `${orderLongId}`});
+                                                // dong lenh short
+                                                binance.futuresCancel(configs.symbol, {orderId: `${orderShortMId}`});
                                                 // mo lenh long
                                                 await openLong(Math.round(price) - configs.range, configs.amount);
                                             }
                                         } else if (order.price < Math.floor(botLong) - configs.range) {
-                                            if (positionShort === '0.000') {
-                                                // dong lenh short M
-                                                binance.futuresCancel(configs.symbol, {orderId: `${orderShortMId}`});
-                                                // mo lenh short M
-                                                openShortM(Math.round(botLong) - configs.range, configs.amount);
-                                            }
                                             // dong lenh long
                                             binance.futuresCancel(configs.symbol, {orderId: `${orderLongId}`});
+                                            // dong lenh short
+                                            binance.futuresCancel(configs.symbol, {orderId: `${orderShortMId}`});
                                             // mo lenh long
                                             await openLong(Math.round(botLong) - configs.range, configs.amount);
                                         }
@@ -394,26 +345,18 @@ async function tick() {
                                     if (order.status === 'NEW') {
                                         if (positionShort === '0.000' || price > topShort) {
                                             if ((price - order.price) / configs.range <= -2) {
-                                                if (positionLong === '0.000') {
-                                                    // dong lenh long M
-                                                    binance.futuresCancel(configs.symbol, {orderId: `${orderLongMId}`});
-                                                    // mo lenh long M
-                                                    openLongM(Math.round(price) + configs.range, configs.amount);
-                                                }
                                                 // dong lenh short
                                                 binance.futuresCancel(configs.symbol, {orderId: `${orderShortId}`});
+                                                // dong lenh long
+                                                binance.futuresCancel(configs.symbol, {orderId: `${orderLongMId}`});
                                                 // mo lenh short
                                                 await openShort(Math.round(price) + configs.range, configs.amount);
                                             }
                                         } else if (order.price > Math.ceil(topShort) + configs.range) {
-                                            if (positionLong === '0.000') {
-                                                // dong lenh long M
-                                                binance.futuresCancel(configs.symbol, {orderId: `${orderLongMId}`});
-                                                // mo lenh long M
-                                                openLongM(Math.round(topShort) + configs.range, configs.amount);
-                                            }
                                             // dong lenh short
                                             binance.futuresCancel(configs.symbol, {orderId: `${orderShortId}`});
+                                            // dong lenh long
+                                            binance.futuresCancel(configs.symbol, {orderId: `${orderLongMId}`});
                                             // mo lenh short
                                             await openShort(Math.round(topShort) + configs.range, configs.amount);
                                         }
