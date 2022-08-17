@@ -49,8 +49,8 @@ let listMess = [];
 
 let orderLongId;
 let orderShortId;
-let orderLongMId;
-let orderShortMId;
+// let orderLongMId;
+// let orderShortMId;
 let closeLongId;
 let closeShortId;
 
@@ -103,21 +103,22 @@ async function openShort(price, amount) {
             price: `${price}`,
             timeInForce: "GTX",
             newOrderRespType: "ACK"
-        },
-        {   // mo lenh long
-            symbol: configs.symbol,
-            side: "BUY",
-            type: "STOP_MARKET",
-            quantity: `${amount}`,
-            positionSide: "LONG",
-            //price: `${price}`,
-            //timeInForce: "GTX",
-            stopPrice: `${price}`,
-            newOrderRespType: "ACK"
         }
+        // ,
+        // {   // mo lenh long
+        //     symbol: configs.symbol,
+        //     side: "BUY",
+        //     type: "STOP_MARKET",
+        //     quantity: `${amount}`,
+        //     positionSide: "LONG",
+        //     //price: `${price}`,
+        //     //timeInForce: "GTX",
+        //     stopPrice: `${price}`,
+        //     newOrderRespType: "ACK"
+        // }
     ]).then((data) => {
         orderShortId = data[0].orderId;
-        orderLongMId = data[1].orderId;
+        //orderLongMId = data[1].orderId;
         console.log("MO LENH SHORT");
         //console.log(data[0]);
     }).catch(console.log);
@@ -134,21 +135,22 @@ async function openLong(price, amount) {
             price: `${price}`,
             timeInForce: "GTX",
             newOrderRespType: "ACK"
-        },
-        {   // mo lenh short
-            symbol: configs.symbol,
-            side: "SELL",
-            type: "STOP_MARKET",
-            quantity: `${amount}`,
-            positionSide: "SHORT",
-            //price: `${price}`,
-            //timeInForce: "GTX",
-            stopPrice: `${price}`,
-            newOrderRespType: "ACK"
         }
+        // ,
+        // {   // mo lenh short
+        //     symbol: configs.symbol,
+        //     side: "SELL",
+        //     type: "STOP_MARKET",
+        //     quantity: `${amount}`,
+        //     positionSide: "SHORT",
+        //     //price: `${price}`,
+        //     //timeInForce: "GTX",
+        //     stopPrice: `${price}`,
+        //     newOrderRespType: "ACK"
+        // }
     ]).then((data) => {
         orderLongId = data[0].orderId;
-        orderShortMId = data[1].orderId;
+        //orderShortMId = data[1].orderId;
         console.log("MO LENH LONG");
         //console.log(data[0]);
     }).catch(console.log);
@@ -275,7 +277,7 @@ async function tick() {
 
                     // kiem tra vi the
                     await binance.futuresPositionRisk({symbol: configs.symbol}).then(async position => {
-                        if (position[0].positionAmt !== '0.000' && position[0].positionAmt !== positionLong && position[0].positionAmt >= position[1].positionAmt) {
+                        if (position[0].positionAmt !== '0.000' && position[0].positionAmt !== positionLong) {
                             if (positionLong === '0.000')
                                 // mo lenh close long
                                 openCloseLong(Math.ceil(position[0].entryPrice) + configs.range, position[0].positionAmt);
@@ -287,7 +289,7 @@ async function tick() {
                                 });
                         }
                         positionLong = position[0].positionAmt;
-                        if (position[1].positionAmt !== '0.000' && position[1].positionAmt !== positionShort && position[1].positionAmt >= position[0].positionAmt) {
+                        if (position[1].positionAmt !== '0.000' && position[1].positionAmt !== positionShort) {
                             if (positionShort === '0.000')
                                 // mo lenh close short
                                 openCloseShort(Math.floor(position[1].entryPrice) - configs.range, position[1].positionAmt);
@@ -311,36 +313,36 @@ async function tick() {
                                             if ((order.price - price) / configs.range <= -2) {
                                                 // dong lenh long
                                                 binance.futuresCancel(configs.symbol, {orderId: `${orderLongId}`});
-                                                // dong lenh short
-                                                binance.futuresCancel(configs.symbol, {orderId: `${orderShortMId}`});
+                                                // // dong lenh short
+                                                // binance.futuresCancel(configs.symbol, {orderId: `${orderShortMId}`});
                                                 // mo lenh long
                                                 await openLong(Math.round(price) - configs.range, configs.amount);
                                             }
                                         } else if (order.price < Math.floor(botLong) - configs.range) {
                                             // dong lenh long
                                             binance.futuresCancel(configs.symbol, {orderId: `${orderLongId}`});
-                                            // dong lenh short
-                                            binance.futuresCancel(configs.symbol, {orderId: `${orderShortMId}`});
+                                            // // dong lenh short
+                                            // binance.futuresCancel(configs.symbol, {orderId: `${orderShortMId}`});
                                             // mo lenh long
                                             await openLong(Math.round(botLong) - configs.range, configs.amount);
                                         }
                                     } else {
-                                        if (order.status === 'FILLED') {
-                                            binance.futuresMultipleOrders([
-                                                {   // dong lenh short
-                                                    symbol: configs.symbol,
-                                                    side: "BUY",
-                                                    type: "LIMIT",
-                                                    quantity: `${-configs.amount}`,
-                                                    positionSide: "SHORT",
-                                                    price: `${order.price - configs.range}`,
-                                                    timeInForce: "GTC",
-                                                    newOrderRespType: "ACK"
-                                                }
-                                            ]).then((data) => {
-                                                console.log("DONG VI THE SHORT");
-                                            }).catch(console.log);
-                                        }
+                                        // if (order.status === 'FILLED') {
+                                        //     binance.futuresMultipleOrders([
+                                        //         {   // dong lenh short
+                                        //             symbol: configs.symbol,
+                                        //             side: "BUY",
+                                        //             type: "LIMIT",
+                                        //             quantity: `${-configs.amount}`,
+                                        //             positionSide: "SHORT",
+                                        //             price: `${order.price - configs.range}`,
+                                        //             timeInForce: "GTC",
+                                        //             newOrderRespType: "ACK"
+                                        //         }
+                                        //     ]).then((data) => {
+                                        //         console.log("DONG VI THE SHORT");
+                                        //     }).catch(console.log);
+                                        // }
                                         // mo lenh long
                                         await openLong(Math.round(Math.min(price, order.price)) - configs.range, configs.amount);
                                     }
@@ -363,36 +365,36 @@ async function tick() {
                                             if ((price - order.price) / configs.range <= -2) {
                                                 // dong lenh short
                                                 binance.futuresCancel(configs.symbol, {orderId: `${orderShortId}`});
-                                                // dong lenh long
-                                                binance.futuresCancel(configs.symbol, {orderId: `${orderLongMId}`});
+                                                // // dong lenh long
+                                                // binance.futuresCancel(configs.symbol, {orderId: `${orderLongMId}`});
                                                 // mo lenh short
                                                 await openShort(Math.round(price) + configs.range, configs.amount);
                                             }
                                         } else if (order.price > Math.ceil(topShort) + configs.range) {
                                             // dong lenh short
                                             binance.futuresCancel(configs.symbol, {orderId: `${orderShortId}`});
-                                            // dong lenh long
-                                            binance.futuresCancel(configs.symbol, {orderId: `${orderLongMId}`});
+                                            // // dong lenh long
+                                            // binance.futuresCancel(configs.symbol, {orderId: `${orderLongMId}`});
                                             // mo lenh short
                                             await openShort(Math.round(topShort) + configs.range, configs.amount);
                                         }
                                     } else {
-                                        if (order.status === 'FILLED') {
-                                            binance.futuresMultipleOrders([
-                                                {   // dong lenh long
-                                                    symbol: configs.symbol,
-                                                    side: "SELL",
-                                                    type: "LIMIT",
-                                                    quantity: `${configs.amount}`,
-                                                    positionSide: "LONG",
-                                                    price: `${order.price + configs.range}`,
-                                                    timeInForce: "GTC",
-                                                    newOrderRespType: "ACK"
-                                                }
-                                            ]).then((data) => {
-                                                console.log("DONG VI THE LONG");
-                                            }).catch(console.log);
-                                        }
+                                        // if (order.status === 'FILLED') {
+                                        //     binance.futuresMultipleOrders([
+                                        //         {   // dong lenh long
+                                        //             symbol: configs.symbol,
+                                        //             side: "SELL",
+                                        //             type: "LIMIT",
+                                        //             quantity: `${configs.amount}`,
+                                        //             positionSide: "LONG",
+                                        //             price: `${order.price + configs.range}`,
+                                        //             timeInForce: "GTC",
+                                        //             newOrderRespType: "ACK"
+                                        //         }
+                                        //     ]).then((data) => {
+                                        //         console.log("DONG VI THE LONG");
+                                        //     }).catch(console.log);
+                                        // }
                                         // mo lenh short
                                         await openShort(Math.round(Math.max(price, order.price)) + configs.range, configs.amount);
                                     }
@@ -446,7 +448,8 @@ async function main() {
         //console.log(data.close);
         io.emit("price", `${configs.symbol}: ${data.close}`);
         binance.futuresBalance().then(values => {
-            io.emit("balance", `${Number(values[9].balance).toFixed(2)} ${values[9].crossUnPnl > 0 ? '+' : ''}${Number(values[9].crossUnPnl).toFixed(2)} | BUSD`);
+            if (values.length > 0)
+                io.emit("balance", `${Number(values[9].balance).toFixed(2)} ${values[9].crossUnPnl > 0 ? '+' : ''}${Number(values[9].crossUnPnl).toFixed(2)} | BUSD`);
         });
     });
 
