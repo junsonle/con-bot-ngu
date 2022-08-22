@@ -383,10 +383,10 @@ async function tick() {
                             if (order.orderId) {
                                 if (order.status === 'NEW') {
                                     if (order.stopPrice - configs.range * 2 >= price) {
-                                        openLongM(Math.round(order.stopPrice) - configs.range, order.orderId);
+                                        //openLongM(Math.round(order.stopPrice) - configs.range, order.orderId);
                                     }
                                 } else {
-                                    openLongM(Math.round(order.stopPrice) + configs.range);
+                                    openLongM(Math.round(order.avgPrice) + configs.range);
                                 }
                             } else {
                                 openLongM(Math.round(price) + configs.range);
@@ -426,10 +426,10 @@ async function tick() {
                             if (order.orderId) {
                                 if (order.status === 'NEW') {
                                     if (price - configs.range * 2 >= order.stopPrice) {
-                                        openShortM(Math.round(order.stopPrice) + configs.range, order.orderId);
+                                        //openShortM(Math.round(order.stopPrice) + configs.range, order.orderId);
                                     }
                                 } else {
-                                    openShortM(Math.round(order.stopPrice) - configs.range);
+                                    openShortM(Math.round(order.avgPrice) - configs.range);
                                 }
                             } else {
                                 openShortM(Math.round(price) - configs.range);
