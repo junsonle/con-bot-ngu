@@ -6,39 +6,64 @@
     <script src="socket.io/socket.io.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <style>
+        .container {
+            float: left;
+            padding: 10px;
+            width: fit-content;
+            /*border-radius: 10px;*/
+            background: rgb(30, 35, 41);
+            border: rgb(71, 77, 87) solid 0.1px;
+        }
+
         body {
+            margin: 0px;
             text-align: center;
+            color: white;
+            background: rgb(43, 49, 58);
         }
 
         form {
-            background: gainsboro;
-            width: fit-content;
-            padding: 10px;
-            border-radius: 10px;
+            margin: 0px;
         }
 
         input {
-            height: 25px;
-            border-radius: 5px;
+            border-radius: 4px;
+            margin: 2px;
+            padding: 5px;
+            color: white;
+        }
+
+        input[type=button] {
+            border: none;
+            background: rgb(71, 77, 87);
+            min-width: 50px;
+        }
+
+        input[type=text] {
+            border: rgb(71, 77, 87) solid 0.1px;
+            background: none;
         }
 
         label {
             display: inline-block;
             height: fit-content;
             width: fit-content;
-            word-wrap: break-word
+            word-wrap: break-word;
+            color: rgb(132, 142, 156);
+            padding: 5px;
+            border-radius: 3px;
         }
 
         .mess {
+            color: white;
             width: 90%;
             border-radius: 8px;
             margin: 2px;
-            padding: 5px;
+            background: rgb(43, 49, 58);
         }
 
         #me {
             float: right;
-            background: #11bdfb;
             border-bottom-right-radius: 0px;
             text-align: right;
         }
@@ -46,18 +71,14 @@
         #other {
             float: left;
             border-bottom-left-radius: 0px;
-            background: #d7d7d7;
             text-align: left;
         }
 
         #messagesBox {
             width: 400px;
-            height: 400px;
-            margin-top: 20px;
-            padding: 10px;
+            height: 600px;
+            /*margin-top: 10px;*/
             overflow-y: scroll;
-            border: black solid 0.5px;
-            border-radius: 10px;
         }
 
         ::-webkit-scrollbar {
@@ -67,15 +88,18 @@
     <script>
         const socket = io("https://con-bot-dot.herokuapp.com");
 
-        var run;
+        let run;
 
-        socket.on("configs", function (params) {
-            console.log(params);
-            $("#symbol").val(params.symbol).prop('disabled', params.run);
-            $("#amount").val(params.amount).prop('disabled', params.run);
-            $("#range").val(params.range).prop('disabled', params.run);
-            $("#run").val(params.run ? 'ON' : 'OFF');
-            run = params.run;
+        socket.on("configs", function (configs) {
+            console.log(configs);
+            $("#symbol").val(configs.symbol).prop('disabled', configs.run);
+            $("#amount").val(configs.amount).prop('disabled', configs.run);
+            $("#range").val(configs.range).prop('disabled', configs.run);
+            $("#sideL").prop('checked', configs.sideLong);
+            $("#sideS").prop('checked', configs.sideShort);
+            $("#run").val(!configs.run ? 'ON' : 'OFF');
+            $("#on").prop("checked", configs.run);
+            run = configs.run;
         });
 
         function updateScroll() {
@@ -117,7 +141,9 @@
                     run: !run,
                     symbol: $("#symbol").val(),
                     amount: $("#amount").val(),
-                    range: $("#range").val()
+                    range: $("#range").val(),
+                    sideLong: $("#sideL").is(':checked'),
+                    sideShort: $("#sideS").is(':checked'),
                 });
             });
 
@@ -152,36 +178,44 @@
     </script>
 </head>
 <body>
-<div id="title">
-    <h3 id="price">Messenger</h3>
-</div>
-<div align="center">
+<div class="container">
+    <input id="on" type="radio" style="float: left; width: 15px; height: 15px"/>
+    <h4 id="price" style="margin: 10px">Messenger</h4>
+    <label id="balance">BUSD</label>
     <form id="form">
         <table>
             <tr>
-                <td><label>Symbol:</label></td>
+                <td><label>Symbol</label></td>
                 <td><input id="symbol" type="text" name="symbol" placeholder="symbol"/></td>
             </tr>
             <tr>
-                <td><label>Amount:</label></td>
+                <td><label>Amount</label></td>
                 <td><input id="amount" type="text" name="amount" placeholder="amount"/></td>
             </tr>
             <tr>
-                <td><label>Range:</label></td>
+                <td><label>Range</label></td>
                 <td><input id="range" type="text" name="range" placeholder="range"/></td>
+            </tr>
+            <tr>
+                <td><label>Side</label></td>
+                <td>
+                    <label style="background: rgb(14, 203, 129); color: white"><input id="sideL" type="checkbox"
+                                                                                      name="sideL"/> Long </label>
+                    <label style="background: rgb(246, 70, 93); color: white"><input id="sideS" type="checkbox"
+                                                                                     name="sideS"/> Short </label>
+                </td>
             </tr>
         </table>
         <br/>
         <!--        <label>ON/OFF: </label>-->
-        <input id="run" type="button" value="OFF" name="run"/>
+        <input id="run" type="button" value="ON" name="run"/>
         <input id="clear" type="button" value="CLEAR" name="clear"/>
     </form>
 </div>
-<div id="balance"></div><br>
-<div align="center">
+<div class="container">
     <input id="message" type="text" name="mess" placeholder="message"/>
     <input id="chat" type="button" value="send" name="chat"/><br>
-    <div id="messagesBox" class="box"></div>
+    <label id="messagesBox"></label>
 </div>
 </body>
 </html>

@@ -32,7 +32,7 @@ const binance = new Binance().options({
     useServerTime: true,
     test: true,
     urls: {
-        base: 'https://testnet.binance.vision/api/', // remove this to trade on mainnet
+        base: 'https://testnet.binance.vision/api/',
         combineStream: 'wss://testnet.binance.vision/stream?streams=',
         stream: 'wss://testnet.binance.vision/ws/'
     },
@@ -43,41 +43,52 @@ const ping = new Monitor({
     interval: 20 // minutes
 });
 
-var run = false;
-var symbol = 'BTCBUSD';
-var amount = 0.001;
-var range = 20;
+let configs = {
+    symbol: 'BTCBUSD',
+    run: false,
+    amount: 0.001,
+    range: 20,
+    sideLong: true,
+    sideShort: true,
+}
 
-var listMess = [];
+let listMess = [];
 
 let orderLongId;
 let orderShortId;
+let orderLongMId;
+let orderShortMId;
 let closeLongId;
 let closeShortId;
 
-async function openCloseShort(price, amount) {
-    await binance.futuresMultipleOrders([
+function closeShort(price, amount, oldOrderId) {
+    closeShortId = -1;
+    binance.futuresMultipleOrders([
         {   // dong lenh short
-            symbol: symbol,
+            symbol: configs.symbol,
             side: "BUY",
             type: "LIMIT",
-            quantity: `${-amount}`,
+            quantity: `${amount}`,
             positionSide: "SHORT",
             price: `${price}`,
             timeInForce: "GTC",
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
-        closeShortId = data[0].orderId;
-        console.log("DONG VI THE SHORT");
-        //console.log(data[0]);
-    }).catch(console.log);
+        console.log("DONG VI THE SHORT " + price);
+        if (data[0].code)
+            console.log(data[0]);
+    }).catch(reason => {
+        closeShortId = null;
+        console.log(reason);
+    });
 }
 
-async function openCloseLong(price, amount) {
-    await binance.futuresMultipleOrders([
+function closeLong(price, amount, oldOrderId) {
+    closeLongId = -1;
+    binance.futuresMultipleOrders([
         {   // dong lenh long
-            symbol: symbol,
+            symbol: configs.symbol,
             side: "SELL",
             type: "LIMIT",
             quantity: `${amount}`,
@@ -87,48 +98,121 @@ async function openCloseLong(price, amount) {
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
-        closeLongId = data[0].orderId;
-        console.log("DONG VI THE LONG");
-        //console.log(data[0]);
-    }).catch(console.log);
+        console.log("DONG VI THE LONG " + price);
+        if (data[0].code)
+            console.log(data[0]);
+    }).catch(reason => {
+        closeLongId = null;
+        console.log(reason);
+    });
 }
 
-async function openShort(price, amount) {
-    await binance.futuresMultipleOrders([
+function openShort(price, oldOrderId) {
+    orderShortId = -1;
+    binance.futuresMultipleOrders([
         {   //mo lenh short
-            symbol: symbol,
+            symbol: configs.symbol,
             side: "SELL",
             type: "LIMIT",
-            quantity: `${amount}`,
+            quantity: `${configs.amount}`,
             positionSide: "SHORT",
             price: `${price}`,
             timeInForce: "GTX",
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
-        orderShortId = data[0].orderId;
-        console.log("MO LENH SHORT");
-        //console.log(data[0]);
-    }).catch(console.log);
+        console.log("MO LENH SHORT LIMIT " + price);
+        if (data[0].code)
+            console.log(data[0]);
+        else
+            orderShortId = data[0].orderId;
+    }).catch(reason => {
+        orderShortId = null;
+        console.log(reason);
+    });
 }
 
-async function openLong(price, amount) {
-    await binance.futuresMultipleOrders([
+function openLong(price, oldOrderId) {
+    orderLongId = -1;
+    binance.futuresMultipleOrders([
         {   //mo lenh long
-            symbol: symbol,
+            symbol: configs.symbol,
             side: "BUY",
             type: "LIMIT",
-            quantity: `${amount}`,
+            quantity: `${configs.amount}`,
             positionSide: "LONG",
             price: `${price}`,
             timeInForce: "GTX",
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
-        orderLongId = data[0].orderId;
-        console.log("MO LENH LONG");
-        //console.log(data[0]);
-    }).catch(console.log);
+        console.log("MO LENH LONG LIMIT " + price);
+        if (data[0].code)
+            console.log(data[0]);
+        else
+            orderLongId = data[0].orderId;
+    }).catch(reason => {
+        orderLongId = null;
+        console.log(reason);
+    });
+}
+
+function openShortM(price, close, oldOrderId) {
+    orderShortMId = -1;
+    binance.futuresMultipleOrders([
+        {   // mo lenh short
+            symbol: configs.symbol,
+            side: "SELL",
+            type: "STOP_MARKET",
+            quantity: `${configs.amount}`,
+            positionSide: "SHORT",
+            stopPrice: `${price}`,
+            newOrderRespType: "ACK"
+        }
+    ]).then((data) => {
+        console.log("MO LENH LONG MAKET " + price);
+        orderShortMId = data[0].orderId;
+        if (data[0].code)
+            console.log(data[0]);
+        else {
+            if (close)
+                closeShort(price, configs.amount);
+            if (oldOrderId)
+                binance.futuresCancel(configs.symbol, {orderId: `${oldOrderId}`});
+        }
+    }).catch(reason => {
+        orderShortMId = null;
+        console.log(reason);
+    });
+}
+
+function openLongM(price, close, oldOrderId) {
+    orderLongMId = -1;
+    binance.futuresMultipleOrders([
+        {   // mo lenh long
+            symbol: configs.symbol,
+            side: "BUY",
+            type: "STOP_MARKET",
+            quantity: `${configs.amount}`,
+            positionSide: "LONG",
+            stopPrice: `${price}`,
+            newOrderRespType: "ACK"
+        }
+    ]).then((data) => {
+        console.log("MO LENH SHORT MAKET " + price);
+        orderLongMId = data[0].orderId;
+        if (data[0].code)
+            console.log(data[0]);
+        else {
+            if (close)
+                closeLong(price, configs.amount);
+            if (oldOrderId)
+                binance.futuresCancel(configs.symbol, {orderId: `${oldOrderId}`});
+        }
+    }).catch(reason => {
+        orderLongMId = null;
+        console.log(reason);
+    });
 }
 
 function serverSendMessage(message) {
@@ -154,7 +238,7 @@ function serverSendBalance() {
 io.on('connect', function (socket) {
 
     console.log(socket.id + " Da ket noi!");
-    io.to(socket.id).emit("configs", {run: run, symbol: symbol, amount: amount, range: range});
+    io.to(socket.id).emit("configs", configs);
     io.to(socket.id).emit("listMess", listMess);
 
     socket.on('clientSendMessage', function (data) {
@@ -163,23 +247,23 @@ io.on('connect', function (socket) {
         socket.broadcast.emit("serverSendMessage", data);
 
         if (data.value === 'clear') {
-            if (run)
+            if (configs.run)
                 serverSendMessage('Server is runing!');
             else
                 // dong tat ca cac lenh
-                binance.futuresCancelAll(symbol).then(value => {
+                binance.futuresCancelAll(configs.symbol).then(value => {
                     if (value.code === 200) {
                         //listMess = [];
-                        orderLongId = orderShortId = closeLongId = closeShortId = null;
+                        orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
                         serverSendMessage('Done!');
                     } else
                         serverSendMessage('Error!');
                 });
         } else if (data.value === 'order') {
-            binance.futuresOpenOrders(symbol).then(value => {
+            binance.futuresOpenOrders(configs.symbol).then(value => {
                 value.forEach(data => {
                     serverSendMessage(
-                        `${symbol}: 
+                        `${configs.symbol}: 
                         ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | 
                         ${data.positionSide} | 
                         ${data.price}`
@@ -189,7 +273,7 @@ io.on('connect', function (socket) {
         } else if (data.value === 'balance') {
             serverSendBalance();
         } else if (data.value === 'position') {
-            binance.futuresPositionRisk({symbol: symbol}).then(position => {
+            binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
                 position.forEach(data => {
                     serverSendMessage(`${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
                 });
@@ -200,20 +284,19 @@ io.on('connect', function (socket) {
     socket.on('run', function (data) {
         postgres.query(`update config set run=${data.run}, amount=${data.amount}, range=${data.range} where id = 2;`, (err, res) => {
             if (err) throw err;
-            run = data.run;
-            symbol = data.symbol;
-            amount = Number(data.amount);
-            range = Number(data.range);
+            configs = data;
+            configs.amount = Number(data.amount);
+            configs.range = Number(data.range);
 
-            if (run)
+            if (configs.run)
                 ping.restart();
             else
                 ping.stop();
 
-            console.log('Config: ', data);
-            console.log("Trade " + (run ? 'on' : 'off'));
+            console.log('Configs: ', data);
+            console.log("Trade " + (configs.run ? 'on' : 'off'));
             socket.emit("configs", data);
-            serverSendMessage("Trade " + (run ? 'on' : 'off'));
+            serverSendMessage("Trade " + (configs.run ? 'on' : 'off'));
             serverSendBalance();
             tick();
         });
@@ -240,112 +323,130 @@ ping.on('stop', function (res, state) {
 });
 
 async function tick() {
-    let lastPrice = 0;
-    let positionLong = '0.000';
-    let positionShort = '0.000';
-    while (run) {
+    let price, position, positionLong = '0.000', positionShort = '0.000';
+    while (configs.run) {
         try {
-            await binance.futuresPrices().then(async prices => {
-                let price = prices[symbol];
-
-                if (price !== lastPrice) {
-                    //console.log(symbol + ": " + price);
-
-                    // kiem tra vi the
-                    await binance.futuresPositionRisk({symbol: symbol}).then(async position => {
-                        if (position[0].positionAmt !== '0.000' && position[0].positionAmt !== positionLong) {
-                            if (positionLong === '0.000')
-                                // mo lenh close long
-                                openCloseLong(Math.ceil(position[0].entryPrice) + range, position[0].positionAmt);
-                            else
-                                // dong lenh close long
-                                binance.futuresCancel(symbol, {orderId: `${closeLongId}`}).then(value => {
-                                    // mo lenh close long
-                                    openCloseLong(Math.ceil(position[0].entryPrice) + range, position[0].positionAmt);
-                                });
-                        }
-                        positionLong = position[0].positionAmt;
-                        if (position[1].positionAmt !== '0.000' && position[1].positionAmt !== positionShort) {
-                            if (positionShort === '0.000')
-                                // mo lenh close short
-                                openCloseShort(Math.floor(position[1].entryPrice) - range, position[1].positionAmt);
-                            else
-                                // dong lenh close short
-                                binance.futuresCancel(symbol, {orderId: `${closeShortId}`}).then(value => {
-                                    // mo lenh close short
-                                    openCloseShort(Math.floor(position[1].entryPrice) - range, position[1].positionAmt);
-                                });
-                        }
-                        positionShort = position[1].positionAmt;
-
-                        if (price > lastPrice) {
-                            let botLong = Number(position[0].entryPrice) - range * (positionLong / amount - 1) / 2;
-                            // kiem tra lenh long
-                            await binance.futuresOrderStatus(symbol, {orderId: `${orderLongId}`}).then(async order => {
-                                if (order.orderId)
-                                    if (order.status === 'NEW') {
-                                        if (positionLong === '0.000' || price < botLong) {
-                                            if ((order.price - price) / range <= -2) {
-                                                // dong lenh long
-                                                binance.futuresCancel(symbol, {orderId: `${orderLongId}`});
-                                                // mo lenh long
-                                                await openLong(Math.round(price) - range, amount);
-                                            }
-                                        } else if (order.price < Math.floor(botLong) - range) {
-                                            // dong lenh long
-                                            binance.futuresCancel(symbol, {orderId: `${orderLongId}`});
-                                            // mo lenh long
-                                            await openLong(Math.round(botLong) - range, amount);
-                                        }
-                                    } else {
-                                        // mo lenh long
-                                        await openLong(Math.round(Math.min(price, order.price)) - range, amount);
-                                    }
-                                else if (positionLong === '0.000' || botLong > price) {
-                                    // mo lenh long
-                                    await openLong(Math.round(price) - range, amount);
-                                } else {
-                                    // mo lenh long
-                                    await openLong(Math.round(botLong) - range, amount);
-                                }
-                            });
-                        } else {
-                            let topShort = Number(position[1].entryPrice) + range * (positionShort / -amount - 1) / 2;
-                            // kiem tra lenh short
-                            await binance.futuresOrderStatus(symbol, {orderId: `${orderShortId}`}).then(async order => {
-                                if (order.orderId)
-                                    if (order.status === 'NEW') {
-                                        if (positionShort === '0.000' || price > topShort) {
-                                            if ((price - order.price) / range <= -2) {
-                                                // dong lenh short
-                                                binance.futuresCancel(symbol, {orderId: `${orderShortId}`});
-                                                // mo lenh short
-                                                await openShort(Math.round(price) + range, amount);
-                                            }
-                                        } else if (order.price > Math.ceil(topShort) + range) {
-                                            // dong lenh short
-                                            binance.futuresCancel(symbol, {orderId: `${orderShortId}`});
-                                            // mo lenh short
-                                            await openShort(Math.round(topShort) + range, amount);
-                                        }
-                                    } else {
-                                        // mo lenh short
-                                        await openShort(Math.round(Math.max(price, order.price)) + range, amount);
-                                    }
-                                else if (positionShort === '0.000' || price > topShort) {
-                                    // mo lenh short
-                                    await openShort(Math.round(price) + range, amount);
-                                } else {
-                                    // mo lenh short
-                                    await openShort(Math.round(topShort) + range, amount);
-                                }
-                            });
-                        }
-                    });
-
-                    lastPrice = price;
-                }
+            await binance.futuresPrices().then(prices => {
+                price = prices[configs.symbol];
             });
+
+            position = await binance.futuresPositionRisk({symbol: configs.symbol});
+
+            if (price && position) {
+                // if (position[0].positionAmt !== '0.000' && position[0].positionAmt !== positionLong && position[0].positionAmt <= position[1].positionAmt) {
+                //     if (positionLong === '0.000')
+                //         closeLong(Math.round(position[0].entryPrice) + configs.range, position[0].positionAmt);
+                //     else
+                //         binance.futuresCancel(configs.symbol, {orderId: `${closeLongId}`}).then(value => {
+                //             closeLong(Math.round(position[0].entryPrice) + configs.range, position[0].positionAmt);
+                //         });
+                // }
+                positionLong = position[0].positionAmt;
+
+                // if (position[1].positionAmt !== '0.000' && position[1].positionAmt !== positionShort && position[0].positionAmt >= position[1].positionAmt) {
+                //     if (positionShort === '0.000')
+                //         closeShort(Math.round(position[1].entryPrice) - configs.range, 0 - position[1].positionAmt);
+                //     else
+                //         binance.futuresCancel(configs.symbol, {orderId: `${closeShortId}`}).then(value => {
+                //             closeShort(Math.round(position[1].entryPrice) - configs.range, 0 - position[1].positionAmt);
+                //         });
+                // }
+                positionShort = position[1].positionAmt;
+
+                if (configs.sideLong) {
+                    let botLong = Number(position[0].entryPrice) - configs.range * (positionLong / configs.amount - 1) / 2;
+                    // if (orderLongId !== -1)
+                    //     binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongId}`}).then(order => {
+                    //         if (order.orderId) {
+                    //             if (order.status === 'NEW') {
+                    //                 if (positionLong === '0.000' || price < botLong) {
+                    //                     if ((order.price - price) / configs.range <= -2) {
+                    //                         binance.futuresCancel(configs.symbol, {orderId: `${orderLongId}`});
+                    //                         openLong(Math.round(price) - configs.range);
+                    //                     }
+                    //                 } else if (order.price < Math.floor(botLong) - configs.range) {
+                    //                     binance.futuresCancel(configs.symbol, {orderId: `${orderLongId}`});
+                    //                     openLong(Math.round(botLong) - configs.range);
+                    //                 }
+                    //             } else {
+                    //                 if (order.status === 'FILLED') {
+                    //                     closeLong(Number(order.price) + configs.range, configs.amount);
+                    //                 }
+                    //                 openLong(Math.round(Math.min(price, order.price)) - configs.range);
+                    //             }
+                    //         } else if (positionLong === '0.000' || botLong > price) {
+                    //             openLong(Math.round(price) - configs.range);
+                    //         } else {
+                    //             openLong(Math.round(botLong) - configs.range);
+                    //         }
+                    //     });
+                    if (orderLongMId !== -1)
+                        binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongMId}`}).then(order => {
+                            if (order.orderId) {
+                                if (order.status === 'NEW') {
+                                    if (order.stopPrice - configs.range * 2 >= price) {
+                                        //binance.futuresCancel(configs.symbol, {orderId: `${orderShortMId}`});
+                                        openLongM(Math.round(order.stopPrice) - configs.range, false, order.orderId);
+                                    }
+                                } else {
+                                    // if (order.status === 'FILLED') {
+                                    //     closeLong(Number(order.stopPrice) - configs.range, configs.amount);
+                                    // }
+                                    openLongM(Math.round(order.stopPrice) + configs.range, true);
+                                }
+                            } else {
+                                openLongM(Math.round(price) + configs.range, true);
+                            }
+                        });
+                }
+
+                if (configs.sideShort) {
+                    let topShort = Number(position[1].entryPrice) + configs.range * (positionShort / -configs.amount - 1) / 2;
+                    // if (orderShortId !== -1)
+                    //     binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortId}`}).then(order => {
+                    //         if (order.orderId)
+                    //             if (order.status === 'NEW') {
+                    //                 if (positionShort === '0.000' || price > topShort) {
+                    //                     if ((price - order.price) / configs.range <= -2) {
+                    //                         binance.futuresCancel(configs.symbol, {orderId: `${orderShortId}`});
+                    //                         openShort(Math.round(price) + configs.range);
+                    //                     }
+                    //                 } else if (order.price > Math.ceil(topShort) + configs.range) {
+                    //                     binance.futuresCancel(configs.symbol, {orderId: `${orderShortId}`});
+                    //                     openShort(Math.round(topShort) + configs.range);
+                    //                 }
+                    //             } else {
+                    //                 if (order.status === 'FILLED') {
+                    //                     closeShort(Number(order.price) - configs.range, configs.amount);
+                    //                 }
+                    //                 openShort(Math.round(Math.max(price, order.price)) + configs.range);
+                    //             }
+                    //         else if (positionShort === '0.000' || price > topShort) {
+                    //             openShort(Math.round(price) + configs.range);
+                    //         } else {
+                    //             openShort(Math.round(topShort) + configs.range);
+                    //         }
+                    //     });
+                    if (orderShortMId !== -1)
+                        binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortMId}`}).then(order => {
+                            if (order.orderId) {
+                                if (order.status === 'NEW') {
+                                    if (price - configs.range * 2 >= order.stopPrice) {
+                                        //binance.futuresCancel(configs.symbol, {orderId: `${orderLongMId}`});
+                                        openShortM(Math.round(order.stopPrice) + configs.range, false, order.orderId);
+                                    }
+                                } else {
+                                    // if (order.status === 'FILLED') {
+                                    //     closeShort(Number(order.stopPrice) - configs.range, configs.amount);
+                                    // }
+                                    openShortM(Math.round(order.stopPrice) - configs.range, true);
+                                }
+                            } else {
+                                openShortM(Math.round(price) - configs.range, true);
+                            }
+                        });
+                }
+            }
         } catch (e) {
             console.log(e.code);
             serverSendMessage(e.code);
@@ -357,18 +458,19 @@ async function main() {
 
     await postgres.query('select * from config where id = 2;', (err, res) => {
         if (err) throw err;
-        run = res.rows[0].run;
-        symbol = res.rows[0].symbol;
-        amount = res.rows[0].amount;
-        range = res.rows[0].range;
-        if (run) {
+        configs.run = res.rows[0].run;
+        configs.symbol = res.rows[0].symbol;
+        configs.amount = res.rows[0].amount;
+        configs.range = res.rows[0].range;
+        if (configs.run) {
             // dong tat ca cac lenh
-            binance.futuresCancelAll(symbol).then(value => {
+            binance.futuresCancelAll(configs.symbol).then(value => {
                 if (value.code === 200) {
                     //listMess = [];
                     orderLongId = orderShortId = closeLongId = closeShortId = null;
-                    console.log("Trade " + (run ? 'on' : 'off'));
-                    serverSendMessage("Trade " + (run ? 'on' : 'off'));
+
+                    console.log("Trade " + (configs.run ? 'on' : 'off'));
+                    serverSendMessage("Trade " + (configs.run ? 'on' : 'off'));
                     serverSendBalance();
                     tick();
                 }
@@ -377,11 +479,12 @@ async function main() {
             ping.stop;
     });
 
-    binance.futuresMiniTickerStream(symbol, data => {
+    binance.futuresMiniTickerStream(configs.symbol, data => {
         //console.log(data.close);
-        io.emit("price", `${symbol}: ${data.close}`);
+        io.emit("price", `${configs.symbol}: ${data.close}`);
         binance.futuresBalance().then(values => {
-            io.emit("balance", `${Number(values[2].balance).toFixed(2)} ${values[2].crossUnPnl > 0 ? '+' : ''}${Number(values[2].crossUnPnl).toFixed(2)} | BUSD`);
+            if (values.length > 0)
+                io.emit("balance", `${Number(values[2].balance).toFixed(2)} ${values[2].crossUnPnl > 0 ? '+' : ''}${Number(values[2].crossUnPnl).toFixed(2)} | BUSD`);
         });
     });
 }
