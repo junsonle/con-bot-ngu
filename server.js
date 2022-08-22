@@ -175,8 +175,8 @@ function openShortM(price, close, oldOrderId) {
         if (data[0].code)
             console.log(data[0]);
         else {
-            if (close)
-                closeShort(price, configs.amount);
+            // if (close)
+            //     closeShort(price, configs.amount);
             if (oldOrderId)
                 binance.futuresCancel(configs.symbol, {orderId: `${oldOrderId}`});
         }
@@ -204,8 +204,8 @@ function openLongM(price, close, oldOrderId) {
         if (data[0].code)
             console.log(data[0]);
         else {
-            if (close)
-                closeLong(price, configs.amount);
+            // if (close)
+            //     closeLong(price, configs.amount);
             if (oldOrderId)
                 binance.futuresCancel(configs.symbol, {orderId: `${oldOrderId}`});
         }
@@ -389,9 +389,9 @@ async function tick() {
                                         openLongM(Math.round(order.stopPrice) - configs.range, false, order.orderId);
                                     }
                                 } else {
-                                    // if (order.status === 'FILLED') {
-                                    //     closeLong(Number(order.stopPrice) - configs.range, configs.amount);
-                                    // }
+                                    if (order.status === 'FILLED') {
+                                        closeLong(Math.round(order.avgPrice) + configs.range, configs.amount);
+                                    }
                                     openLongM(Math.round(order.stopPrice) + configs.range, true);
                                 }
                             } else {
@@ -436,9 +436,9 @@ async function tick() {
                                         openShortM(Math.round(order.stopPrice) + configs.range, false, order.orderId);
                                     }
                                 } else {
-                                    // if (order.status === 'FILLED') {
-                                    //     closeShort(Number(order.stopPrice) - configs.range, configs.amount);
-                                    // }
+                                    if (order.status === 'FILLED') {
+                                        closeShort(Math.round(order.avgPrice) - configs.range, configs.amount);
+                                    }
                                     openShortM(Math.round(order.stopPrice) - configs.range, true);
                                 }
                             } else {
