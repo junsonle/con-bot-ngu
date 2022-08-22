@@ -75,7 +75,7 @@ function closeShort(price, amount, oldOrderId) {
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
-        console.log("DONG VI THE SHORT " + price);
+        console.log("CLOSE SHORT " + price + " " + amount);
         if (data[0].code)
             console.log(data[0]);
     }).catch(reason => {
@@ -98,7 +98,7 @@ function closeLong(price, amount, oldOrderId) {
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
-        console.log("DONG VI THE LONG " + price);
+        console.log("CLOSE LONG " + price + " " + amount);
         if (data[0].code)
             console.log(data[0]);
     }).catch(reason => {
@@ -121,11 +121,13 @@ function openShort(price, oldOrderId) {
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
-        console.log("MO LENH SHORT LIMIT " + price);
+        console.log("OPEN SHORT LIMIT " + price);
+        orderShortId = data[0].orderId;
         if (data[0].code)
             console.log(data[0]);
-        else
-            orderShortId = data[0].orderId;
+        else if (oldOrderId) {
+            binance.futuresCancel(configs.symbol, {orderId: `${oldOrderId}`});
+        }
     }).catch(reason => {
         orderShortId = null;
         console.log(reason);
@@ -146,11 +148,13 @@ function openLong(price, oldOrderId) {
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
-        console.log("MO LENH LONG LIMIT " + price);
+        console.log("OPEN LONG LIMIT " + price);
+        orderLongId = data[0].orderId;
         if (data[0].code)
             console.log(data[0]);
-        else
-            orderLongId = data[0].orderId;
+        else if (oldOrderId) {
+            binance.futuresCancel(configs.symbol, {orderId: `${oldOrderId}`});
+        }
     }).catch(reason => {
         orderLongId = null;
         console.log(reason);
@@ -170,7 +174,7 @@ function openShortM(price, oldOrderId) {
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
-        console.log("MO LENH LONG MAKET " + price);
+        console.log("OPEN LONG MAKET " + price);
         orderShortMId = data[0].orderId;
         if (data[0].code)
             console.log(data[0]);
@@ -196,7 +200,7 @@ function openLongM(price, oldOrderId) {
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
-        console.log("MO LENH SHORT MAKET " + price);
+        console.log("OPEN SHORT MAKET " + price);
         orderLongMId = data[0].orderId;
         if (data[0].code)
             console.log(data[0]);
