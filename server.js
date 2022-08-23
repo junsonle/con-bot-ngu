@@ -383,7 +383,8 @@ async function tick() {
                                                         }
                                                     });
                                                 }
-                                            openLongM(Math.round(price) + configs.range);
+                                            if (topLong < order.stopPrice)
+                                                openLongM(Math.round(price) + configs.range);
                                         }
                                     });
                                 }
@@ -442,7 +443,8 @@ async function tick() {
                                                         }
                                                     });
                                                 }
-                                            openShortM(Math.round(price) - configs.range);
+                                            if (botShort > order.stopPrice)
+                                                openShortM(Math.round(price) - configs.range);
                                         }
                                     });
                                 }
