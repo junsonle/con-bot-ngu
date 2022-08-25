@@ -364,7 +364,7 @@ async function tick() {
                                                 openLongM(Math.round(price) + configs.range, order.orderId);
                                             }
                                         } else {
-                                            if (order.status === 'FILLED' || 0 - position[1].entryPrice >= position[0].entryPrice)
+                                            if (order.status === 'FILLED' || 0 - position[1].positionAmt >= position[0].positionAmt)
                                                 // close short
                                                 if (closeShortId !== -1 && position[1].positionAmt !== '0.000') {
                                                     binance.futuresOrderStatus(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
@@ -424,7 +424,7 @@ async function tick() {
                                                 openShortM(Math.round(price) - configs.range, order.orderId);
                                             }
                                         } else {
-                                            if (order.status === 'FILLED' || 0 - position[1].entryPrice <= position[0].entryPrice)
+                                            if (order.status === 'FILLED' || 0 - position[1].positionAmt <= position[0].positionAmt)
                                                 // close long
                                                 if (closeLongId !== -1 && position[0].positionAmt !== '0.000') {
                                                     binance.futuresOrderStatus(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
@@ -450,6 +450,7 @@ async function tick() {
                             }
                         }
                     });
+                } else
                     await binance.futuresOpenOrders(configs.symbol).then(orders => {
                         orders.forEach(order => {
                             switch (order.orderId) {
@@ -473,7 +474,6 @@ async function tick() {
                             }
                         });
                     });
-                }
             });
         } catch (e) {
             console.log(e.code);
