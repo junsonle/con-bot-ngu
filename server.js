@@ -251,7 +251,7 @@ io.on('connect', function (socket) {
             else
                 // dong tat ca cac lenh
                 binance.futuresCancelAll(configs.symbol).then(value => {
-                    if (value.code == 200) {
+                    if (value.code === 200) {
                         //listMess = [];
                         orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
                         serverSendMessage('Done!');
@@ -329,7 +329,6 @@ async function tick() {
                 if (price !== prices[configs.symbol]) {
                     price = prices[configs.symbol];
                     // console.log(price);
-
                     await binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
                         if (position) {
                             if (configs.sideLong) {
@@ -365,7 +364,7 @@ async function tick() {
                                                 openLongM(Math.round(price) + configs.range, order.orderId);
                                             }
                                         } else {
-                                            if (order.status === 'FILLED' || closeShortId === null)
+                                            if (order.status === 'FILLED' || 0 - position[1].entryPrice >= position[0].entryPrice)
                                                 // close short
                                                 if (closeShortId !== -1 && position[1].positionAmt !== '0.000') {
                                                     binance.futuresOrderStatus(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
@@ -425,7 +424,7 @@ async function tick() {
                                                 openShortM(Math.round(price) - configs.range, order.orderId);
                                             }
                                         } else {
-                                            if (order.status === 'FILLED' || closeLongId === null)
+                                            if (order.status === 'FILLED' || 0 - position[1].entryPrice <= position[0].entryPrice)
                                                 // close long
                                                 if (closeLongId !== -1 && position[0].positionAmt !== '0.000') {
                                                     binance.futuresOrderStatus(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
@@ -467,7 +466,9 @@ async function tick() {
                                 case closeShortId:
                                     break;
                                 default:
-                                    binance.futuresOrderStatus(configs.symbol, {orderId: `${order.orderId}`});
+                                    binance.futuresCancel(configs.symbol, {orderId: `${order.orderId}`}).then(value => {
+                                        console.log('CANCEL ORDER ' + value.price + " " + value.origQty);
+                                    });
                                     break;
                             }
                         });
@@ -492,7 +493,7 @@ async function main() {
         if (configs.run) {
             // dong tat ca cac lenh
             binance.futuresCancelAll(configs.symbol).then(value => {
-                if (value.code == 200) {
+                if (value.code === 200) {
                     //listMess = [];
                     orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
 
