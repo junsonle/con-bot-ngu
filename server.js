@@ -448,7 +448,7 @@ async function tick() {
                 });
             } else if (orderLongId !== -1 && orderShortId !== -1 && orderLongMId !== -1 && orderShortMId !== -1 && closeLongId !== -1 && closeShortId !== -1)
                 await binance.futuresOpenOrders(configs.symbol).then(orders => {
-                    orders.forEach(order => {
+                    orders.filter(o => o.side + o.positionSide === 'BUYLONG' || o.side + o.positionSide === 'SELLSHORT').forEach(order => {
                         switch (order.orderId) {
                             case orderLongId:
                                 break;
@@ -458,10 +458,10 @@ async function tick() {
                                 break;
                             case orderShortMId:
                                 break;
-                            case closeLongId:
-                                break;
-                            case closeShortId:
-                                break;
+                            //case closeLongId:
+                            //    break;
+                            //case closeShortId:
+                            //    break;
                             default:
                                 console.log('CANCEL ORDER ' + (order.price - order.stopPrice) + " " + order.origQty);
                                 binance.futuresCancel(configs.symbol, {orderId: `${order.orderId}`});
