@@ -95,8 +95,8 @@
             $("#symbol").val(configs.symbol).prop('disabled', configs.run);
             $("#amount").val(configs.amount).prop('disabled', configs.run);
             $("#range").val(configs.range).prop('disabled', configs.run);
-            $("#sideL").prop('checked', configs.sideLong);
-            $("#sideS").prop('checked', configs.sideShort);
+            $("#sideL").prop('checked', configs.long);
+            $("#sideS").prop('checked', configs.short);
             $("#run").val(!configs.run ? 'ON' : 'OFF');
             $("#on").prop("checked", configs.run);
             run = configs.run;
@@ -138,12 +138,13 @@
         $(document).ready(function () {
             $("#run").click(function () {
                 socket.emit("run", {
+                    id: 1,
                     run: !run,
                     symbol: $("#symbol").val(),
                     amount: $("#amount").val(),
                     range: $("#range").val(),
-                    sideLong: $("#sideL").is(':checked'),
-                    sideShort: $("#sideS").is(':checked'),
+                    long: $("#sideL").is(':checked'),
+                    short: $("#sideS").is(':checked'),
                 });
             });
 
