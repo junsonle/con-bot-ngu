@@ -342,7 +342,7 @@ async function tick() {
                                             openLongM(Math.round(price) + configs.range, order.origQty);
                                         }
                                     } else {
-                                        if (order.status === 'FILLED')
+                                        if (order.status === 'FILLED' || position[1].positionAmt < 0)
                                             // close short
                                             if (closeShortId !== -1) {
                                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
@@ -358,7 +358,9 @@ async function tick() {
                                                     }
                                                 });
                                             }
-                                        if (x < 0)
+                                        if (x >= 0)
+                                            openLongM(Math.round(price) + configs.range, configs.amount);
+                                        else
                                             openLongM(Math.round(price) + configs.range, -x);
                                     }
                                 });
@@ -399,7 +401,7 @@ async function tick() {
                                             openShortM(Math.round(price) - configs.range, order.origQty);
                                         }
                                     } else {
-                                        if (order.status === 'FILLED')
+                                        if (order.status === 'FILLED' || position[0].positionAmt > 0)
                                             // close long
                                             if (closeLongId !== -1) {
                                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
@@ -416,7 +418,9 @@ async function tick() {
                                                     }
                                                 });
                                             }
-                                        if (x > 0)
+                                        if (x <= 0)
+                                            openShortM(Math.round(price) - configs.range, configs.amount);
+                                        else
                                             openShortM(Math.round(price) - configs.range, x);
                                     }
                                 });
