@@ -358,9 +358,7 @@ async function tick() {
                                                     }
                                                 });
                                             }
-                                        if (x >= 0)
-                                            openLongM(Math.round(price) + configs.range, configs.amount);
-                                        else
+                                        if (x < 0)
                                             openLongM(Math.round(price) + configs.range, -x);
                                     }
                                 });
@@ -418,9 +416,7 @@ async function tick() {
                                                     }
                                                 });
                                             }
-                                        if (x <= 0)
-                                            openShortM(Math.round(price) - configs.range, configs.amount);
-                                        else
+                                        if (x > 0)
                                             openShortM(Math.round(price) - configs.range, x);
                                     }
                                 });
