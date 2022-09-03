@@ -342,7 +342,7 @@ async function tick() {
                                             openLongM(Math.round(price) + configs.range, order.origQty);
                                         }
                                     } else {
-                                        if (order.status === 'FILLED' || position[1].positionAmt < 0)
+                                        if (order.status === 'FILLED')
                                             // close short
                                             if (closeShortId !== -1) {
                                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
@@ -399,7 +399,7 @@ async function tick() {
                                             openShortM(Math.round(price) - configs.range, order.origQty);
                                         }
                                     } else {
-                                        if (order.status === 'FILLED' || position[0].positionAmt > 0)
+                                        if (order.status === 'FILLED')
                                             // close long
                                             if (closeLongId !== -1) {
                                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
