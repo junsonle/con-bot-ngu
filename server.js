@@ -330,7 +330,7 @@ async function tick() {
                                 });
                             }
                             // open long market
-                            if (orderLongMId !== -1) {
+                            if (orderLongMId === -1) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongMId}`}).then(order => {
                                     if (order.status === 'NEW') {
                                         if (order.stopPrice - configs.range * 2 >= price) {
@@ -388,7 +388,7 @@ async function tick() {
                                 });
                             }
                             // open short market
-                            if (orderShortMId !== -1) {
+                            if (orderShortMId === -1) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortMId}`}).then(order => {
                                     if (order.status === 'NEW') {
                                         if (price - configs.range * 2 >= order.stopPrice) {
