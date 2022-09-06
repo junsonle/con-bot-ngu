@@ -322,8 +322,8 @@ async function tick() {
                                     } else {
                                         if (x >= 0)
                                             openLong(Math.round(price) - configs.range, configs.amount);
-                                        else
-                                            openLong(Math.round(price) - configs.range, -x);
+                                        else if (position[0].positionAmt === '0.000')
+                                            openLong(Math.round(price) - configs.range, -x / 2);
                                     }
                                 });
                             }
@@ -376,8 +376,8 @@ async function tick() {
                                     } else {
                                         if (x <= 0)
                                             openShort(Math.round(price) + configs.range, configs.amount);
-                                        else
-                                            openShort(Math.round(price) + configs.range, x);
+                                        else if (position[1].positionAmt === '0.000')
+                                            openShort(Math.round(price) + configs.range, x / 2);
                                     }
                                 });
                             }
