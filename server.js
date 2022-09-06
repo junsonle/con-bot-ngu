@@ -320,10 +320,10 @@ async function tick() {
                                             openLong(Math.round(botLong) - configs.range, order.origQty);
                                         }
                                     } else {
-                                        if (x >= 0)
-                                            openLong(Math.round(price) - configs.range, configs.amount);
-                                        else if (position[0].positionAmt === '0.000')
+                                        if (position[0].positionAmt === '0.000' && x < -configs.amount)
                                             openLong(Math.round(price) - configs.range, -x / 2);
+                                        else
+                                            openLong(Math.round(price) - configs.range, configs.amount);
                                     }
                                 });
                             }
@@ -374,10 +374,10 @@ async function tick() {
                                             openShort(Math.round(topShort) + configs.range, order.origQty);
                                         }
                                     } else {
-                                        if (x <= 0)
-                                            openShort(Math.round(price) + configs.range, configs.amount);
-                                        else if (position[1].positionAmt === '0.000')
+                                        if (position[1].positionAmt === '0.000' && x > configs.amount)
                                             openShort(Math.round(price) + configs.range, x / 2);
+                                        else
+                                            openShort(Math.round(price) + configs.range, configs.amount);
                                     }
                                 });
                             }
