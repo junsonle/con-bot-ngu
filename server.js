@@ -322,7 +322,8 @@ async function tick() {
                                                     }
                                                 });
                                             }
-                                        openLong(Math.round(price) - configs.range, configs.amount);
+                                        if (position[0].positionAmt / configs.amount < 30)
+                                            openLong(Math.round(price) - configs.range, configs.amount);
                                     }
                                 });
                             }
@@ -373,7 +374,8 @@ async function tick() {
                                                     }
                                                 });
                                             }
-                                        openShort(Math.round(price) + configs.range, configs.amount);
+                                        if (position[1].positionAmt / -configs.amount < 30)
+                                            openShort(Math.round(price) + configs.range, configs.amount);
                                     }
                                 });
                             }
