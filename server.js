@@ -38,6 +38,7 @@ let configs = {
     run: false,
     amount: 0.001,
     range: 20,
+    maxOrder: 50,
     long: true,
     short: true,
 }
@@ -290,7 +291,7 @@ async function tick() {
                 await binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
                     if (position) {
                         //let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
-                        if (configs.long) {
+                        if (configs.long && position[0].positionAmt / configs.amount <= configs.maxOrder) {
                             // open long limit
                             if (orderLongId !== -1) {
                                 let botLong = Number(position[0].entryPrice) - configs.range * (position[0].positionAmt / configs.amount - 1) / 2;
@@ -341,7 +342,7 @@ async function tick() {
 
                         //---------------------------------------//
 
-                        if (configs.short) {
+                        if (configs.short && position[1].positionAmt / -configs.amount <= configs.maxOrder) {
                             // open short limit
                             if (orderShortId !== -1) {
                                 let topShort = Number(position[1].entryPrice) + configs.range * (position[1].positionAmt / -configs.amount - 1) / 2;
