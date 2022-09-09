@@ -322,13 +322,13 @@ async function tick() {
                                                     }
                                                 });
                                             }
-                                        if (position[0].positionAmt / configs.amount < 30)
+                                        if (position[0].positionAmt / configs.amount < 40)
                                             openLong(Math.round(price) - configs.range, configs.amount);
                                     }
                                 });
                             }
                             // open long market
-                            if (orderLongMId === -1) {
+                            if (orderLongMId !== -1 && position[0].positionAmt / configs.amount < 40) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongMId}`}).then(order => {
                                     if (order.status === 'NEW') {
                                         if (order.stopPrice - configs.range * 2 >= price) {
@@ -374,13 +374,13 @@ async function tick() {
                                                     }
                                                 });
                                             }
-                                        if (position[1].positionAmt / -configs.amount < 30)
+                                        if (position[1].positionAmt / -configs.amount < 40)
                                             openShort(Math.round(price) + configs.range, configs.amount);
                                     }
                                 });
                             }
                             // open short market
-                            if (orderShortMId === -1) {
+                            if (orderShortMId !== -1 && position[1].positionAmt / -configs.amount < 40) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortMId}`}).then(order => {
                                     if (order.status === 'NEW') {
                                         if (price - configs.range * 2 >= order.stopPrice) {
