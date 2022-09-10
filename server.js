@@ -38,6 +38,7 @@ let configs = {
     run: false,
     amount: 0.001,
     range: 20,
+    maxOrder: 40,
     long: true,
     short: true,
 }
