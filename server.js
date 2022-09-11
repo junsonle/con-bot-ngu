@@ -38,7 +38,6 @@ let configs = {
     run: false,
     amount: 0.001,
     range: 20,
-    maxOrder: 40,
     long: true,
     short: true,
 }
@@ -310,7 +309,7 @@ async function tick() {
                                         } else if (order.price < Math.floor(botLong) - configs.range) {
                                             openLong(Math.round(botLong) - configs.range, order.origQty);
                                         }
-                                    } else if (position[0].positionAmt / configs.amount < configs.maxOrder) {
+                                    } else {
                                         openLong(Math.round(price) - configs.range, configs.amount);
                                     }
                                 });
@@ -340,8 +339,7 @@ async function tick() {
                                                     }
                                                 });
                                             }
-                                        if (position[0].positionAmt / configs.amount < configs.maxOrder)
-                                            openLongM(Math.round(price) + configs.range, configs.amount);
+                                        openLongM(Math.round(price) + configs.range, configs.amount);
                                     }
                                 });
                             }
@@ -362,7 +360,7 @@ async function tick() {
                                         } else if (order.price > Math.ceil(topShort) + configs.range) {
                                             openShort(Math.round(topShort) + configs.range, order.origQty);
                                         }
-                                    } else if (position[1].positionAmt / -configs.amount < configs.maxOrder) {
+                                    } else {
                                         openShort(Math.round(price) + configs.range, configs.amount);
                                     }
                                 });
@@ -392,8 +390,7 @@ async function tick() {
                                                     }
                                                 });
                                             }
-                                        if (position[1].positionAmt / -configs.amount < configs.maxOrder)
-                                            openShortM(Math.round(price) - configs.range, configs.amount);
+                                        openShortM(Math.round(price) - configs.range, configs.amount);
                                     }
                                 });
                             }
