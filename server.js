@@ -321,9 +321,11 @@ async function tick() {
                                         if (position[0].positionAmt === '0.000' || price < botLong) {
                                             if ((order.price - price) / configs.range <= -2) {
                                                 openLong(Math.round(price) - configs.range, order.origQty);
+                                                openShortM(Math.round(price) - configs.range, configs.amount);
                                             }
                                         } else if (order.price < Math.floor(botLong) - configs.range) {
                                             openLong(Math.round(botLong) - configs.range, order.origQty);
+                                            openShortM(Math.round(price) - configs.range, configs.amount);
                                         }
                                     } else {
                                         if (order.status === 'FILLED')
@@ -334,6 +336,7 @@ async function tick() {
                                                 //}
                                             });
                                         openLong(Math.round(price) - configs.range, configs.amount);
+                                        openShortM(Math.round(price) - configs.range, configs.amount);
                                     }
                                 });
                             }
@@ -379,9 +382,11 @@ async function tick() {
                                         if (position[1].positionAmt === '0.000' || price > topShort) {
                                             if ((price - order.price) / configs.range <= -2) {
                                                 openShort(Math.round(price) + configs.range, order.origQty);
+                                                openLongM(Math.round(price) + configs.range, configs.amount);
                                             }
                                         } else if (order.price > Math.ceil(topShort) + configs.range) {
                                             openShort(Math.round(topShort) + configs.range, order.origQty);
+                                            openLongM(Math.round(price) + configs.range, configs.amount);
                                         }
                                     } else {
                                         if (order.status === 'FILLED')
@@ -392,6 +397,7 @@ async function tick() {
                                                 //}
                                             });
                                         openShort(Math.round(price) + configs.range, configs.amount);
+                                        openLongM(Math.round(price) + configs.range, configs.amount);
                                     }
                                 });
                             }
@@ -414,16 +420,16 @@ async function tick() {
             } else if (orderLongId !== -1 && orderShortId !== -1 && orderLongMId !== -1 && orderShortMId !== -1 && closeLongId !== -1 && closeShortId !== -1)
                 await binance.futuresOpenOrders(configs.symbol).then(orders => {
                     if (orders) {
-                        orders.filter(o => o.type === "LIMIT").forEach(order => {
+                        orders.forEach(order => {
                             switch (order.orderId) {
                                 case orderLongId:
                                     break;
                                 case orderShortId:
                                     break;
-                                // case orderLongMId:
-                                //     break;
-                                // case orderShortMId:
-                                //     break;
+                                case orderLongMId:
+                                    break;
+                                case orderShortMId:
+                                    break;
                                 case closeLongId:
                                    break;
                                 case closeShortId:
