@@ -301,7 +301,7 @@ async function tick() {
                             if (closeLongId !== -1  && position[0].positionAmt > 0) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
                                     if (order.status === 'NEW') {
-                                        if (price - configs.range * 2 >= order.price)
+                                        if (order.price - configs.range * 2 >= price)
                                             closeLong(Math.round(order.price) - configs.range, configs.amount);
                                     } else {
                                         closeLong(Math.round(price) + configs.range, configs.amount);
@@ -339,7 +339,7 @@ async function tick() {
                             if (closeShortId !== -1 && position[1].positionAmt < 0) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
                                     if (order.status === 'NEW') {
-                                        if (order.price - configs.range * 2 >= price)
+                                        if (price - configs.range * 2 >= order.price)
                                             closeShort(Math.round(order.price) + configs.range, configs.amount);
                                     } else {
                                         closeShort(Math.round(price) - configs.range, configs.amount);
