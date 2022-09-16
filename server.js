@@ -55,7 +55,7 @@ function closeShort(price, amount) {
         {   // dong lenh short
             symbol: configs.symbol,
             side: "BUY",
-            type: "STOP_LIMIT",
+            type: "STOP",
             quantity: `${amount}`,
             positionSide: "SHORT",
             price: `${price - configs.range / 2}`,
@@ -77,7 +77,7 @@ function closeLong(price, amount) {
         {   // dong lenh long
             symbol: configs.symbol,
             side: "SELL",
-            type: "STOP_LIMIT",
+            type: "STOP",
             quantity: `${amount}`,
             positionSide: "LONG",
             price: `${price + configs.range / 2}`,
