@@ -310,7 +310,7 @@ async function tick() {
                                         if (price - configs.range * 2 > order.price && price > position[0].entryPrice - 5)
                                             closeLong(Math.round(order.price) - configs.range, configs.amount);
                                     } else {
-                                        closeLong(Math.round(order.price) + configs.range / 2, configs.amount);
+                                        closeLong(Math.round(price) + configs.range / 2, configs.amount);
                                     }
                                 });
                             }
@@ -361,7 +361,7 @@ async function tick() {
                                         if (order.price - configs.range * 2 > price && price - 5 < position[1].entryPrice)
                                             closeShort(Math.round(order.price) + configs.range, configs.amount);
                                     } else {
-                                        closeShort(Math.round(order.price) - configs.range / 2, configs.amount);
+                                        closeShort(Math.round(price) - configs.range / 2, configs.amount);
                                     }
                                 });
                             }
