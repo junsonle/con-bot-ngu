@@ -40,7 +40,9 @@ let configs = {
     range: 20,
     long: true,
     short: true,
+
 }
+let maxOrder = 10;
 let listMess = [];
 let orderLongId;
 let orderShortId;
@@ -304,7 +306,7 @@ async function tick() {
                                         if (order.price - configs.range * 2 > price && price > position[0].entryPrice - 5)
                                             closeLong(Math.round(order.price) - configs.range, configs.amount);
                                     } else {
-                                        closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range / 2, configs.amount);
+                                        closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range, configs.amount);
                                     }
                                 });
                             }
@@ -327,7 +329,8 @@ async function tick() {
                                     } else {
                                         if (order.status === 'FILLED')
                                             closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
-                                        openLong(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
+                                        if (position[0].positionAmt / configs.amount <= maxOrder)
+                                            openLong(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
                                         if (x >= 0)
                                             openShortM(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
                                     }
@@ -358,7 +361,7 @@ async function tick() {
                                         if (price - configs.range * 2 > order.price && price - 5 < position[1].entryPrice)
                                             closeShort(Math.round(order.price) + configs.range, configs.amount);
                                     } else {
-                                        closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range / 2, configs.amount);
+                                        closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, configs.amount);
                                     }
                                 });
                             }
@@ -381,7 +384,8 @@ async function tick() {
                                     } else {
                                         if (order.status === 'FILLED')
                                             closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
-                                        openShort(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
+                                        if (position[1].positionAmt / -configs.amount <= maxOrder)
+                                            openShort(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
                                         if (x <= 0)
                                             openLongM(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
                                     }
