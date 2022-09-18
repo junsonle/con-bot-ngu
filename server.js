@@ -304,7 +304,7 @@ async function tick() {
                                         if (order.price - configs.range * 2 > price && price > position[0].entryPrice - 5)
                                             closeLong(Math.round(order.price) - configs.range, configs.amount);
                                     } else {
-                                        closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range, configs.amount);
+                                        closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range / 2, configs.amount);
                                     }
                                 });
                             }
@@ -325,8 +325,8 @@ async function tick() {
                                     } else {
                                         if (order.status === 'FILLED')
                                             closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
-                                        openLong(Math.round(botLong > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
-                                        openShortM(Math.round(botLong > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
+                                        openLong(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
+                                        openShortM(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
                                     }
                                 });
                             }
@@ -355,7 +355,7 @@ async function tick() {
                                         if (price - configs.range * 2 > order.price && price - 5 < position[1].entryPrice)
                                             closeShort(Math.round(order.price) + configs.range, configs.amount);
                                     } else {
-                                        closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, configs.amount);
+                                        closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range / 2, configs.amount);
                                     }
                                 });
                             }
@@ -376,7 +376,7 @@ async function tick() {
                                     } else {
                                         if (order.status === 'FILLED')
                                             closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
-                                        openShort(Math.round(topShort > price ? topShort : price), configs.amount);
+                                        openShort(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
                                         openLongM(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
                                     }
                                 });
