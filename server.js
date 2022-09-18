@@ -295,7 +295,7 @@ async function tick() {
                 // console.log(price);
                 await binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
                     if (position) {
-                        //let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
+                        let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
                         if (configs.long) {
                             // close long
                             if (closeLongId !== -1  && position[0].positionAmt > 0) {
@@ -316,17 +316,20 @@ async function tick() {
                                         if (position[0].positionAmt === '0.000' || price < botLong) {
                                             if ((order.price - price) / configs.range <= -2) {
                                                 openLong(Math.round(price) - configs.range, order.origQty);
-                                                openShortM(Math.round(price) - configs.range, configs.amount);
+                                                if (x >= 0)
+                                                    openShortM(Math.round(price) - configs.range, configs.amount);
                                             }
                                         } else if (order.price < Math.floor(botLong) - configs.range) {
                                             openLong(Math.round(botLong) - configs.range, order.origQty);
-                                            openShortM(Math.round(botLong) - configs.range, configs.amount);
+                                            if (x >= 0)
+                                                openShortM(Math.round(botLong) - configs.range, configs.amount);
                                         }
                                     } else {
                                         if (order.status === 'FILLED')
                                             closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
                                         openLong(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
-                                        openShortM(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
+                                        if (x >= 0)
+                                            openShortM(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
                                     }
                                 });
                             }
@@ -367,17 +370,20 @@ async function tick() {
                                         if (position[1].positionAmt === '0.000' || price > topShort) {
                                             if ((price - order.price) / configs.range <= -2) {
                                                 openShort(Math.round(price) + configs.range, order.origQty);
-                                                openLongM(Math.round(price) + configs.range, configs.amount);
+                                                if (x <= 0)
+                                                    openLongM(Math.round(price) + configs.range, configs.amount);
                                             }
                                         } else if (order.price > Math.ceil(topShort) + configs.range) {
                                             openShort(Math.round(topShort) + configs.range, order.origQty);
-                                            openLongM(Math.round(topShort) + configs.range, configs.amount);
+                                            if (x <= 0)
+                                                openLongM(Math.round(topShort) + configs.range, configs.amount);
                                         }
                                     } else {
                                         if (order.status === 'FILLED')
                                             closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
                                         openShort(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
-                                        openLongM(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
+                                        if (x <= 0)
+                                            openLongM(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
                                     }
                                 });
                             }
