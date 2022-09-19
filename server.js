@@ -343,7 +343,8 @@ async function tick() {
                                             openLongM(Math.round(price) + configs.range, order.origQty);
                                         }
                                     } else {
-                                        //if (order.status === 'FILLED' || position[1].positionAmt < 0)
+                                        if (order.status === 'FILLED')
+                                            closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
                                         openLongM(Math.round(price) + configs.range, configs.amount);
                                     }
                                 });
@@ -397,7 +398,8 @@ async function tick() {
                                             openShortM(Math.round(price) - configs.range, order.origQty);
                                         }
                                     } else {
-                                        //if (order.status === 'FILLED' || position[0].positionAmt > 0)
+                                        if (order.status === 'FILLED')
+                                            closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
                                         openShortM(Math.round(price) - configs.range, configs.amount);
                                     }
                                 });
