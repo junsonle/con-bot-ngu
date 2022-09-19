@@ -297,7 +297,7 @@ async function tick() {
                 // console.log(price);
                 await binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
                     if (position) {
-                        let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
+                        //let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
                         if (configs.long) {
                             // close long
                             if (closeLongId !== -1  && position[0].positionAmt > 0) {
@@ -311,7 +311,7 @@ async function tick() {
                                 });
                             }
                             // open long limit
-                            if (orderLongId !== -1) {
+                            if (orderLongId === -1) {
                                 let botLong = Number(position[0].entryPrice) - configs.range * (position[0].positionAmt / configs.amount - 1) / 2;
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongId}`}).then(order => {
                                     if (order.status === 'NEW') {
@@ -336,18 +336,18 @@ async function tick() {
                                 });
                             }
                             // open long market
-                            // if (orderLongMId === -1 && Math.abs(position[1].positionAmt) >= position[0].positionAmt) {
-                            //     binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongMId}`}).then(order => {
-                            //         if (order.status === 'NEW') {
-                            //             if (order.stopPrice - configs.range * 2 >= price) {
-                            //                 openLongM(Math.round(price) + configs.range, order.origQty);
-                            //             }
-                            //         } else {
-                            //             //if (order.status === 'FILLED' || position[1].positionAmt < 0)
-                            //             openLongM(Math.round(price) + configs.range, configs.amount);
-                            //         }
-                            //     });
-                            // }
+                            if (orderLongMId !== -1) {
+                                binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongMId}`}).then(order => {
+                                    if (order.status === 'NEW') {
+                                        if (order.stopPrice - configs.range * 2 >= price) {
+                                            openLongM(Math.round(price) + configs.range, order.origQty);
+                                        }
+                                    } else {
+                                        //if (order.status === 'FILLED' || position[1].positionAmt < 0)
+                                        openLongM(Math.round(price) + configs.range, configs.amount);
+                                    }
+                                });
+                            }
                         }
 
                         //---------------------------------------//
@@ -365,7 +365,7 @@ async function tick() {
                                 });
                             }
                             // open short limit
-                            if (orderShortId !== -1) {
+                            if (orderShortId === -1) {
                                 let topShort = Number(position[1].entryPrice) + configs.range * (position[1].positionAmt / -configs.amount - 1) / 2;
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortId}`}).then(order => {
                                     if (order.status === 'NEW') {
@@ -390,18 +390,18 @@ async function tick() {
                                 });
                             }
                             // open short market
-                            // if (orderShortMId === -1 && Math.abs(position[1].positionAmt) <= position[0].positionAmt) {
-                            //     binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortMId}`}).then(order => {
-                            //         if (order.status === 'NEW') {
-                            //             if (price - configs.range * 2 >= order.stopPrice) {
-                            //                 openShortM(Math.round(price) - configs.range, order.origQty);
-                            //             }
-                            //         } else {
-                            //             //if (order.status === 'FILLED' || position[0].positionAmt > 0)
-                            //             openShortM(Math.round(price) - configs.range, configs.amount);
-                            //         }
-                            //     });
-                            // }
+                            if (orderShortMId !== -1) {
+                                binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortMId}`}).then(order => {
+                                    if (order.status === 'NEW') {
+                                        if (price - configs.range * 2 >= order.stopPrice) {
+                                            openShortM(Math.round(price) - configs.range, order.origQty);
+                                        }
+                                    } else {
+                                        //if (order.status === 'FILLED' || position[0].positionAmt > 0)
+                                        openShortM(Math.round(price) - configs.range, configs.amount);
+                                    }
+                                });
+                            }
                         }
                     }
                 });
