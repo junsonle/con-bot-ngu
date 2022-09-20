@@ -321,7 +321,10 @@ async function tick() {
                                     } else {
                                         if (order.status === 'FILLED')
                                             closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
-                                        openLong(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
+                                        if (position[0].positionAmt / configs.amount > 10)
+                                            openLong(Math.round(position[0].liquidationPrice) + configs.range, configs.amount);
+                                        else
+                                            openLong(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
                                     }
                                 });
                             }
@@ -365,7 +368,10 @@ async function tick() {
                                     } else {
                                         if (order.status === 'FILLED')
                                             closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
-                                        openShort(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
+                                        if (position[1].positionAmt / -configs.amount > 10)
+                                            openShort(Math.round(position[1].liquidationPrice) - configs.range, configs.amount);
+                                        else
+                                            openShort(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
                                     }
                                 });
                             }
