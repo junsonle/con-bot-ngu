@@ -304,9 +304,9 @@ async function tick() {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
                                     if (order.status === 'NEW') {
                                         if (order.price - configs.range * 2 > price && price > position[0].entryPrice - 5)
-                                            closeLong(Math.round(order.price) - configs.range, order.origQty - configs.amount);
+                                            closeLong(Math.round(order.price) - configs.range, (order.origQty - configs.amount).toFixed(3));
                                     } else if (order.status === 'FILLED') {
-                                        closeLong(Math.round(price) + configs.range, order.origQty + configs.amount);
+                                        closeLong(Math.round(price) + configs.range, Number(order.origQty) + configs.amount);
                                     } else {
                                         closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range, configs.amount);
                                     }
@@ -353,9 +353,9 @@ async function tick() {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
                                     if (order.status === 'NEW') {
                                         if (price - configs.range * 2 > order.price && price - 5 < position[1].entryPrice)
-                                            closeShort(Math.round(order.price) + configs.range, order.origQty - configs.amount);
+                                            closeShort(Math.round(order.price) + configs.range, (order.origQty - configs.amount).toFixed(3));
                                     } else if (order.status === 'FILLED') {
-                                        closeShort(Math.round(price) - configs.range, order.origQty + configs.amount);
+                                        closeShort(Math.round(price) - configs.range, Number(order.origQty) + configs.amount);
                                     } else {
                                         closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, configs.amount);
                                     }
