@@ -318,16 +318,16 @@ async function tick() {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongId}`}).then(order => {
                                     if (position[0].positionAmt / configs.amount > 9) {
                                         if (order.status !== 'NEW')
-                                            openLong(Math.round(position[0].liquidationPrice) + configs.range, configs.amount);
+                                            openLong(Math.round(position[0].entryPrice) + configs.range * position[0].positionAmt / configs.amount, configs.amount);
                                     } else if (order.status === 'NEW') {
                                         if (price - configs.range * 2 > order.price && (price - 5 < botLong || position[0].entryPrice == 0)) {
                                             openLong(Math.round(price) - configs.range, order.origQty);
                                         }
                                     } else {
-                                        if (order.status === 'FILLED')
-                                            closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
                                         openLong(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
                                     }
+                                    if (order.status === 'FILLED')
+                                        closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
                                 });
                             }
                             // open long market
@@ -367,16 +367,16 @@ async function tick() {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortId}`}).then(order => {
                                     if (position[1].positionAmt / -configs.amount > 9) {
                                         if (order.status !== 'NEW')
-                                            openShort(Math.round(position[1].liquidationPrice) - configs.range, configs.amount);
+                                            openShort(Math.round(position[1].entryPrice) - configs.range * position[1].positionAmt / -configs.amount, configs.amount);
                                     } else if (order.status === 'NEW') {
                                         if (order.price - configs.range * 2 > price && price > topShort - 5) {
                                             openShort(Math.round(price) + configs.range, order.origQty);
                                         }
                                     } else {
-                                        if (order.status === 'FILLED')
-                                            closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
                                         openShort(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
                                     }
+                                    if (order.status === 'FILLED')
+                                        closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
                                 });
                             }
                             //open short market
