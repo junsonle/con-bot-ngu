@@ -317,7 +317,7 @@ async function tick() {
                                 let count = position[0].positionAmt / configs.amount;
                                 let botLong = Number(position[0].entryPrice) - configs.range * (count - 1) / 2;
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongId}`}).then(order => {
-                                    if (count > 9) {
+                                    if (count > 19) {
                                         if (order.status !== 'NEW')
                                             openLong(Math.min(Math.round(position[0].entryPrice) - configs.range * count, Math.round(price) - configs.range), configs.amount);
                                     } else if (order.status === 'NEW') {
@@ -367,7 +367,7 @@ async function tick() {
                                 let count = position[1].positionAmt / -configs.amount;
                                 let topShort = Number(position[1].entryPrice) + configs.range * (count - 1) / 2;
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortId}`}).then(order => {
-                                    if (count > 9) {
+                                    if (count > 19) {
                                         if (order.status !== 'NEW')
                                             openShort(Math.max(Math.round(position[1].entryPrice) + configs.range * count, Math.round(price) + configs.range), configs.amount);
                                     } else if (order.status === 'NEW') {
