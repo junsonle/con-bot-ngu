@@ -314,11 +314,12 @@ async function tick() {
                             }
                             // open long limit
                             if (orderLongId !== -1) {
-                                let botLong = Number(position[0].entryPrice) - configs.range * (position[0].positionAmt / configs.amount - 1) / 2;
+                                let count = position[0].positionAmt / configs.amount;
+                                let botLong = Number(position[0].entryPrice) - configs.range * (count - 1) / 2;
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongId}`}).then(order => {
-                                    if (position[0].positionAmt / configs.amount > 9) {
+                                    if (count > 9) {
                                         if (order.status !== 'NEW')
-                                            openLong(Math.round(position[0].entryPrice) + configs.range * position[0].positionAmt / configs.amount, configs.amount);
+                                            openLong(Math.round(position[0].entryPrice) - configs.range * count, configs.amount);
                                     } else if (order.status === 'NEW') {
                                         if (price - configs.range * 2 > order.price && (price - 5 < botLong || position[0].entryPrice == 0)) {
                                             openLong(Math.round(price) - configs.range, order.origQty);
@@ -363,11 +364,12 @@ async function tick() {
                             }
                             // open short limit
                             if (orderShortId !== -1) {
-                                let topShort = Number(position[1].entryPrice) + configs.range * (position[1].positionAmt / -configs.amount - 1) / 2;
+                                let count = position[1].positionAmt / -configs.amount;
+                                let topShort = Number(position[1].entryPrice) + configs.range * (count - 1) / 2;
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortId}`}).then(order => {
-                                    if (position[1].positionAmt / -configs.amount > 9) {
+                                    if (count > 9) {
                                         if (order.status !== 'NEW')
-                                            openShort(Math.round(position[1].entryPrice) - configs.range * position[1].positionAmt / -configs.amount, configs.amount);
+                                            openShort(Math.round(position[1].entryPrice)  + configs.range * count, configs.amount);
                                     } else if (order.status === 'NEW') {
                                         if (order.price - configs.range * 2 > price && price > topShort - 5) {
                                             openShort(Math.round(price) + configs.range, order.origQty);
