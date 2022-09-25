@@ -297,7 +297,7 @@ async function tick() {
                 // console.log(price);
                 await binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
                     if (position) {
-                        let profit = Number(position[0].unRealizedProfit) + Number(position[1].unRealizedProfit) - (position[0].positionAmt - position[1].positionAmt) * 0.0006;
+                        let profit = Number(position[0].unRealizedProfit) + Number(position[1].unRealizedProfit) - (position[0].positionAmt - position[1].positionAmt) * 0.0006 * price;
                         //let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
                         if (configs.long) {
                             // close long
