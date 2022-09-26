@@ -300,7 +300,7 @@ async function tick() {
                         //let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
                         if (configs.long) {
                             // close long
-                            if (closeLongId !== -1  && position[0].positionAmt > 0) {
+                            if (closeLongId === -1  && position[0].positionAmt > 0) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
                                     if (order.status === 'NEW') {
                                         if (order.price - configs.range * 2 > price && price > position[0].entryPrice - 5)
@@ -328,7 +328,8 @@ async function tick() {
                                         openLong(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
                                     }
                                     if (order.status === 'FILLED')
-                                        closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
+                                        //closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
+                                        closeLong(Math.round(price) + configs.range, position[0].positionAmt);
                                 });
                             }
                             // open long market
@@ -350,7 +351,7 @@ async function tick() {
 
                         if (configs.short) {
                             // close short
-                            if (closeShortId !== -1 && position[1].positionAmt < 0) {
+                            if (closeShortId === -1 && position[1].positionAmt < 0) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
                                     if (order.status === 'NEW') {
                                         if (price - configs.range * 2 > order.price && price - 5 < position[1].entryPrice)
@@ -378,7 +379,8 @@ async function tick() {
                                         openShort(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
                                     }
                                     if (order.status === 'FILLED')
-                                        closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
+                                        //closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
+                                        closeShort(Math.round(price) - configs.range, 0 - position[1].positionAmt);
                                 });
                             }
                             //open short market
