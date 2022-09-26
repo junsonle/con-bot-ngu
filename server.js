@@ -329,7 +329,7 @@ async function tick() {
                                     }
                                     if (order.status === 'FILLED')
                                         //closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
-                                        closeLong(Math.round(price) + configs.range, position[0].positionAmt);
+                                        closeLong(Math.round(position[0].entryPrice) + configs.range, position[0].positionAmt);
                                 });
                             }
                             // open long market
@@ -380,7 +380,7 @@ async function tick() {
                                     }
                                     if (order.status === 'FILLED')
                                         //closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
-                                        closeShort(Math.round(price) - configs.range, 0 - position[1].positionAmt);
+                                        closeShort(Math.round(position[1].entryPrice) - configs.range, 0 - position[1].positionAmt);
                                 });
                             }
                             //open short market
