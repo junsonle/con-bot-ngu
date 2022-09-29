@@ -61,7 +61,7 @@ function closeShort(price, amount) {
             quantity: `${amount}`,
             positionSide: "SHORT",
             price: `${price}`,
-            timeInForce: "GTC",
+            timeInForce: "GTX",
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
@@ -82,7 +82,7 @@ function closeLong(price, amount) {
             quantity: `${amount}`,
             positionSide: "LONG",
             price: `${price}`,
-            timeInForce: "GTC",
+            timeInForce: "GTX",
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
@@ -112,7 +112,6 @@ function openShort(price, amount) {
         if (data[0].code)
             console.log(data[0]);
     }).catch(console.log);
-    openLongM(price, amount);
 }
 
 function openLong(price, amount) {
@@ -134,7 +133,6 @@ function openLong(price, amount) {
         if (data[0].code)
             console.log(data[0]);
     }).catch(console.log);
-    openShortM(price, amount);
 }
 
 function openShortM(price, amount) {
@@ -246,7 +244,13 @@ io.on('connect', function (socket) {
     });
 
     socket.on('run', function (data) {
-        postgres.query(`update config set run=${data.run}, amount=${data.amount}, range=${data.range}, long=${data.long}, short=${data.short} where id = ${configs.id};`, async (err, res) => {
+        postgres.query(`update config
+                        set run=${data.run},
+                            amount=${data.amount},
+                            range=${data.range},
+                            long=${data.long},
+                            short=${data.short}
+                        where id = ${configs.id};`, async (err, res) => {
             if (err) throw err;
             configs = data;
             configs.amount = Number(data.amount);
@@ -302,13 +306,15 @@ async function tick() {
                         //let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
                         if (configs.long) {
                             // close long
-                            if (closeLongId !== -1  && position[0].positionAmt > 0) {
+                            if (closeLongId !== -1 && position[0].positionAmt > configs.amount) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
                                     if (order.status === 'NEW') {
                                         if (order.price - configs.range * 2 > price && price > position[0].entryPrice - 5)
-                                            closeLong(Math.round(order.price) - configs.range, configs.amount);
+                                            // closeLong(Math.round(order.price) - configs.range, configs.amount);
+                                            closeLong(Math.round(order.price) - configs.range, (order.origQty - configs.amount).toFixed(3));
                                     } else if (order.status === 'FILLED') {
-                                        closeLong(Math.round(price) + configs.range, configs.amount);
+                                        // closeLong(Math.round(price) + configs.range, configs.amount);
+                                        closeLong(Math.round(price) + configs.range, Number(order.origQty) + configs.amount);
                                     } else {
                                         closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range, configs.amount);
                                     }
@@ -331,10 +337,11 @@ async function tick() {
                                     }
                                     if (order.status === 'FILLED')
                                         closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
+                                    // closeLong(Math.round(position[0].entryPrice) + configs.range, position[0].positionAmt);
                                 });
                             }
                             // open long market
-                            if (orderLongMId === -1) {
+                            if (orderLongMId !== -1) {
                                 //let topLong = Number(position[0].entryPrice) + configs.range * (position[0].positionAmt / configs.amount - 1) / 2;
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongMId}`}).then(order => {
                                     if (order.status === 'NEW') {
@@ -352,13 +359,15 @@ async function tick() {
 
                         if (configs.short) {
                             // close short
-                            if (closeShortId !== -1 && position[1].positionAmt < 0) {
+                            if (closeShortId !== -1 && position[1].positionAmt < -configs.amount) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
                                     if (order.status === 'NEW') {
                                         if (price - configs.range * 2 > order.price && price - 5 < position[1].entryPrice)
-                                            closeShort(Math.round(order.price) + configs.range, configs.amount);
+                                            // closeShort(Math.round(order.price) + configs.range, configs.amount);
+                                            closeShort(Math.round(order.price) + configs.range, (order.origQty - configs.amount).toFixed(3));
                                     } else if (order.status === 'FILLED') {
-                                        closeShort(Math.round(price) - configs.range, configs.amount);
+                                        // closeShort(Math.round(price) - configs.range, configs.amount);
+                                        closeShort(Math.round(price) - configs.range, Number(order.origQty) + configs.amount);
                                     } else {
                                         closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, configs.amount);
                                     }
@@ -381,10 +390,11 @@ async function tick() {
                                     }
                                     if (order.status === 'FILLED')
                                         closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
+                                    // closeShort(Math.round(position[1].entryPrice) - configs.range, 0 - position[1].positionAmt);
                                 });
                             }
                             //open short market
-                            if (orderShortMId === -1) {
+                            if (orderShortMId !== -1) {
                                 //let botShort = Number(position[1].entryPrice) - configs.range * (position[1].positionAmt / -configs.amount - 1) / 2;
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortMId}`}).then(order => {
                                     if (order.status === 'NEW') {
@@ -431,7 +441,9 @@ async function tick() {
 
 async function main() {
     try {
-        await postgres.query(`select * from binance where id = ${configs.id};`, (err, res) => {
+        await postgres.query(`select *
+                              from binance
+                              where id = ${configs.id};`, (err, res) => {
             if (res.rows[0].testnet)
                 binance = new Binance().options({
                     APIKEY: `${res.rows[0].key}`,
@@ -465,7 +477,9 @@ async function main() {
             });
         });
 
-        await postgres.query(`select * from config where id = ${configs.id};`, (err, res) => {
+        await postgres.query(`select *
+                              from config
+                              where id = ${configs.id};`, (err, res) => {
             if (err) throw err;
             configs = res.rows[0];
             if (configs.run) {
