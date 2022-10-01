@@ -350,7 +350,7 @@ async function tick() {
                                     } else {
                                         // openLongM(Math.round(Math.max(price, position[0].entryPrice)) + configs.range, configs.amount);
                                         // openLongM(Math.round(position[0].entryPrice > price ? position[0].entryPrice : price) + configs.range, configs.amount);
-                                        openLongM(Math.round(topLong > price ? ptopLong : price) + configs.range, configs.amount);
+                                        openLongM(Math.round(topLong > price ? topLong : price) + configs.range, configs.amount);
                                     }
                                 });
                             }
