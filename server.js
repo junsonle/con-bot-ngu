@@ -306,7 +306,7 @@ async function tick() {
                         //let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
                         if (configs.long) {
                             // close long
-                            if (closeLongId !== -1 && position[0].positionAmt > configs.amount) {
+                            if (closeLongId !== -1 && position[0].positionAmt > 0) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
                                     if (order.status === 'NEW') {
                                         if (order.price - configs.range * 2 > price && price > position[0].entryPrice - 5)
@@ -360,7 +360,7 @@ async function tick() {
 
                         if (configs.short) {
                             // close short
-                            if (closeShortId !== -1 && position[1].positionAmt < -configs.amount) {
+                            if (closeShortId !== -1 && position[1].positionAmt < 0) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
                                     if (order.status === 'NEW') {
                                         if (price - configs.range * 2 > order.price && price - 5 < position[1].entryPrice)
