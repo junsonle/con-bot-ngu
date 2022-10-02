@@ -367,7 +367,7 @@ async function tick() {
                                             closeShort(Math.round(order.price) + configs.range, order.origQty);
                                         //closeShort(Math.round(order.price) + configs.range, Math.max((order.origQty - configs.amount).toFixed(3), configs.amount));
                                     } else if (order.status === 'FILLED') {
-                                        closeShort(Math.round(price) - configs.range, Math.min(configs.amount, position[0].positionAmt));
+                                        closeShort(Math.round(price) - configs.range, Math.min(configs.amount, 0-position[1].positionAmt));
                                         //closeShort(Math.round(price) - configs.range, Number(order.origQty) + configs.amount);
                                     } else {
                                         closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, configs.amount);
