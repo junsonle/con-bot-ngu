@@ -299,7 +299,15 @@ async function tick() {
         await binance.futuresPrices().then(async prices => {
             if (price !== prices[configs.symbol]) {
                 price = prices[configs.symbol];
-                // console.log(price);
+                io.emit("price", `${configs.symbol}: ${price}`);
+                await binance.futuresBalance().then(values => {
+                    if (values.length > 0) {
+                        values.filter(o => o.asset === 'BUSD').forEach(value => {
+                            io.emit("balance", `${Number(value.balance).toFixed(2)} ${value.crossUnPnl > 0 ? '+' : ''}${Number(value.crossUnPnl).toFixed(2)} | BUSD`);
+                        });
+                    }
+                });
+
                 await binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
                     if (position) {
                         //let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
@@ -464,20 +472,6 @@ async function main() {
                     APIKEY: `${res.rows[0].key}`,
                     APISECRET: `${res.rows[0].secret}`
                 });
-
-            binance.futuresMiniTickerStream(configs.symbol, async data => {
-                if (data) {
-                    //console.log(data.close);
-                    io.emit("price", `${configs.symbol}: ${data.close}`);
-                    await binance.futuresBalance().then(values => {
-                        if (values) {
-                            values.filter(o => o.asset === 'BUSD').forEach(value => {
-                                io.emit("balance", `${Number(value.balance).toFixed(2)} ${value.crossUnPnl > 0 ? '+' : ''}${Number(value.crossUnPnl).toFixed(2)} | BUSD`);
-                            });
-                        }
-                    });
-                }
-            });
         });
 
         await postgres.query(`select *
