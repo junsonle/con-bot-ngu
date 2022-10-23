@@ -52,15 +52,16 @@ let closeShortId;
 
 function closeShort(price, amount) {
     closeShortId = -1;
+    // dong lenh short
     binance.futuresMultipleOrders([
-        {   // dong lenh short
+        {
             symbol: configs.symbol,
             side: "BUY",
             type: "LIMIT",
             quantity: `${amount}`,
             positionSide: "SHORT",
             price: `${price}`,
-            timeInForce: "GTX",
+            timeInForce: "GTC",
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
@@ -73,15 +74,16 @@ function closeShort(price, amount) {
 
 function closeLong(price, amount) {
     closeLongId = -1;
+    // dong lenh long
     binance.futuresMultipleOrders([
-        {   // dong lenh long
+        {
             symbol: configs.symbol,
             side: "SELL",
             type: "LIMIT",
             quantity: `${amount}`,
             positionSide: "LONG",
             price: `${price}`,
-            timeInForce: "GTX",
+            timeInForce: "GTC",
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
@@ -94,8 +96,9 @@ function closeLong(price, amount) {
 
 function openShort(price, amount) {
     orderShortId = -1;
+    //mo lenh short
     binance.futuresMultipleOrders([
-        {   //mo lenh short
+        {
             symbol: configs.symbol,
             side: "SELL",
             type: "LIMIT",
@@ -115,8 +118,9 @@ function openShort(price, amount) {
 
 function openLong(price, amount) {
     orderLongId = -1;
+    //mo lenh long
     binance.futuresMultipleOrders([
-        {   //mo lenh long
+        {
             symbol: configs.symbol,
             side: "BUY",
             type: "LIMIT",
@@ -136,8 +140,9 @@ function openLong(price, amount) {
 
 function openShortM(price, amount) {
     orderShortMId = -1;
+    // mo lenh short
     binance.futuresMultipleOrders([
-        {   // mo lenh short
+        {
             symbol: configs.symbol,
             side: "SELL",
             type: "STOP_MARKET",
@@ -156,8 +161,9 @@ function openShortM(price, amount) {
 
 function openLongM(price, amount) {
     orderLongMId = -1;
+    // mo lenh long
     binance.futuresMultipleOrders([
-        {   // mo lenh long
+        {
             symbol: configs.symbol,
             side: "BUY",
             type: "STOP_MARKET",
@@ -320,8 +326,8 @@ async function tick() {
                                             closeLong(Math.round(order.price) - configs.range, order.origQty);
                                             //closeLong(Math.round(order.price) - configs.range, Math.max((order.origQty - configs.amount).toFixed(3), configs.amount));
                                     } else if (order.status === 'FILLED') {
-                                        closeLong(Math.round(price) + configs.range, Math.min(configs.amount, position[0].positionAmt));
-                                        //closeLong(Math.round(price) + configs.range, Math.max(Number(order.origQty) + configs.amount, position[0].positionAmt));
+                                        //closeLong(Math.round(price) + configs.range, Math.min(configs.amount, position[0].positionAmt));
+                                        closeLong(Math.round(price) + configs.range, Math.min(Number(order.origQty) + configs.amount, position[0].positionAmt));
                                     } else {
                                         closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range, configs.amount);
                                     }
@@ -375,8 +381,8 @@ async function tick() {
                                             closeShort(Math.round(order.price) + configs.range, order.origQty);
                                             //closeShort(Math.round(order.price) + configs.range, Math.max((order.origQty - configs.amount).toFixed(3), configs.amount));
                                     } else if (order.status === 'FILLED') {
-                                        closeShort(Math.round(price) - configs.range, Math.min(configs.amount, position[0].positionAmt));
-                                        //closeShort(Math.round(price) - configs.range, Number(order.origQty) + configs.amount);
+                                        //closeShort(Math.round(price) - configs.range, Math.min(configs.amount, position[0].positionAmt));
+                                        closeShort(Math.round(price) - configs.range, Math.min(Number(order.origQty) + configs.amount, - position[1].positionAmt));
                                     } else {
                                         closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, configs.amount);
                                     }
