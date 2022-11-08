@@ -187,7 +187,7 @@ function serverSendMessage(message) {
 
 function serverSendBalance() {
     binance.futuresBalance().then(values => {
-        if (values) {
+        if (values.length > 0) {
             let mess = '';
             for (let value of values.filter(f => f.balance != 0)) {
                 mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl}<br/>`;
@@ -222,20 +222,22 @@ io.on('connect', function (socket) {
                     serverSendMessage('Error!');
             });
         } else if (data.value === 'order') {
-            binance.futuresOpenOrders(configs.symbol).then(value => {
-                value.forEach(data => {
-                    serverSendMessage(
-                        `${configs.symbol}: 
-                        ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | 
-                        ${data.positionSide} | 
-                        ${data.price}`
-                    );
-                });
+            binance.futuresOpenOrders(configs.symbol).then(values => {
+                if (values.length > 0)
+                    values.forEach(data => {
+                        serverSendMessage(
+                            `${configs.symbol}: 
+                            ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | 
+                            ${data.positionSide} | 
+                            ${data.price}`
+                        );
+                    });
             });
         } else if (data.value === 'balance') {
             serverSendBalance();
         } else if (data.value === 'position') {
             binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
+                if (position.length > 0)
                 position.forEach(data => {
                     serverSendMessage(`${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
                 });
@@ -309,7 +311,7 @@ async function tick() {
                     }
                 });
                 await binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
-                    if (position) {
+                    if (position.length > 0) {
                         //let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
                         if (configs.long) {
                             // close long
@@ -425,7 +427,7 @@ async function tick() {
             }
             if (orderLongId !== -1 && orderShortId !== -1 && orderLongMId !== -1 && orderShortMId !== -1 && closeLongId !== -1 && closeShortId !== -1)
                 await binance.futuresOpenOrders(configs.symbol).then(orders => {
-                    if (orders) {
+                    if (orders.length > 0) {
                         orders.forEach(order => {
                             switch (order.orderId) {
                                 case orderLongId:
@@ -462,7 +464,7 @@ async function main() {
                 binance = new Binance().options({
                     APIKEY: `${res.rows[0].key}`,
                     APISECRET: `${res.rows[0].secret}`,
-                    useServerTime: true,
+                    // useServerTime: true,
                     test: true,
                     urls: {
                         base: 'https://testnet.binance.vision/api/',
