@@ -194,9 +194,9 @@ function serverSendBalance() {
     binance.futuresBalance().then(values => {
         if (values) {
             let mess = '';
-            for (let value of values.filter(f => f.balance != 0)) {
+            values.filter(f => f.balance > 0).forEach(value => {
                 mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl}<br/>`;
-            }
+            });
             serverSendMessage(mess);
         }
     });
