@@ -343,8 +343,8 @@ async function tick() {
                                         openLong(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
                                     }
                                     if (order.status === 'FILLED')
-                                        closeLong(Math.round(order.price) + configs.range, order.origQty);
-                                    // closeLong(Math.round(position[0].entryPrice) + configs.range, position[0].positionAmt);
+                                        // closeLong(Math.round(order.price) + configs.range, order.origQty);
+                                        closeLong(Math.round(order.price) + configs.range, position[0].positionAmt);
                                 });
                             }
                             // open long market
@@ -358,8 +358,8 @@ async function tick() {
                                     } else {
                                         // openLongM(Math.round(Math.max(price, position[0].entryPrice)) + configs.range, configs.amount);
                                         openLongM(Math.round(position[0].entryPrice > price ? position[0].entryPrice : price) + configs.range, configs.amount);
-                                        if (order.status === 'FILLED')
-                                            closeLong(Math.round(order.price) + configs.range, order.origQty);
+                                        // if (order.status === 'FILLED')
+                                        //     closeLong(Math.round(order.avgPrice) + configs.range, order.origQty);
                                     }
                                 });
                             }
@@ -399,8 +399,8 @@ async function tick() {
                                         openShort(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
                                     }
                                     if (order.status === 'FILLED')
-                                        closeShort(Math.round(order.price) - configs.range, order.origQty);
-                                    // closeShort(Math.round(position[1].entryPrice) - configs.range, 0 - position[1].positionAmt);
+                                        // closeShort(Math.round(order.price) - configs.range, order.origQty);
+                                        closeShort(Math.round(order.price) - configs.range, 0 - position[1].positionAmt);
                                 });
                             }
                             //open short market
@@ -414,18 +414,19 @@ async function tick() {
                                     } else {
                                         // openShortM(Math.round(Math.min(price, position[1].entryPrice)) - configs.range, configs.amount);
                                         openShortM(Math.round(position[1].entryPrice > 0 && position[1].entryPrice < price ? position[1].entryPrice : price) - configs.range, configs.amount)
-                                        if (order.status === 'FILLED')
-                                            closeShort(Math.round(order.price) - configs.range, order.origQty);
+                                        // if (order.status === 'FILLED')
+                                        //     closeShort(Math.round(order.avgPrice) - configs.range, order.origQty);
                                     }
                                 });
                             }
                         }
                     }
                 });
-            } else if (orderLongId !== -1 && orderShortId !== -1 && orderLongMId !== -1 && orderShortMId !== -1 && closeLongId !== -1 && closeShortId !== -1)
+            }
+            if (orderLongId !== -1 && orderShortId !== -1 && orderLongMId !== -1 && orderShortMId !== -1 && closeLongId !== -1 && closeShortId !== -1)
                 await binance.futuresOpenOrders(configs.symbol).then(orders => {
                     if (orders) {
-                        orders.filter(o => o.side + o.positionSide === 'BUYLONG' || o.side + o.positionSide === 'SELLSHORT').forEach(order => {
+                        orders.forEach(order => {
                             switch (order.orderId) {
                                 case orderLongId:
                                     break;
