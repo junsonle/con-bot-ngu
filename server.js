@@ -359,7 +359,7 @@ async function tick() {
                                         openLongM(Math.round(position[0].entryPrice > price ? position[0].entryPrice : price) + configs.range, configs.amount);
                                         if (order.status === 'FILLED' && position[1].positionAmt < 0)
                                             binance.futuresCancel(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
-                                                closeShort(Math.round(Math.min(price, position[0].entryPrice)) - configs.range, 0 - position[1].positionAmt);
+                                                closeShort(Math.round(Math.min(price, position[1].entryPrice)) - configs.range, 0 - position[1].positionAmt);
                                             });
                                     }
                                 });
@@ -414,7 +414,7 @@ async function tick() {
                                         openShortM(Math.round(position[1].entryPrice > 0 && position[1].entryPrice < price ? position[1].entryPrice : price) - configs.range, configs.amount)
                                         if (order.status === 'FILLED' && position[0].positionAmt > 0)
                                             binance.futuresCancel(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
-                                                closeLong(Math.round(Math.max(price, position[1].entryPrice)) + configs.range, position[0].positionAmt);
+                                                closeLong(Math.round(Math.max(price, position[0].entryPrice)) + configs.range, position[0].positionAmt);
                                             });
                                     }
                                 });
