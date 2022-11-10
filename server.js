@@ -320,14 +320,7 @@ async function tick() {
                                     if (order.status === 'NEW') {
                                         if (order.price - configs.range * 2 > price && price > position[0].entryPrice - 5)
                                             closeLong(Math.round(order.price) - configs.range, order.origQty);
-                                        //closeLong(Math.round(order.price) - configs.range, Math.max((order.origQty - configs.amount).toFixed(3), configs.amount));
                                     }
-                                    // else if (order.status === 'FILLED') {
-                                    //     closeLong(Math.round(price) + configs.range, Math.min(configs.amount, position[0].positionAmt));
-                                    //     //closeLong(Math.round(price) + configs.range, Math.max(Number(order.origQty) + configs.amount, position[0].positionAmt));
-                                    // } else {
-                                    //     closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range, Math.min(configs.amount, position[0].positionAmt));
-                                    // }
                                 });
                             }
                             // open long limit
@@ -356,7 +349,7 @@ async function tick() {
                                             openLongM(Math.round(price) + configs.range, order.origQty);
                                         }
                                     } else {
-                                        openLongM(Math.round(position[0].entryPrice > price ? position[0].entryPrice : price) + configs.range, configs.amount);
+                                        openLongM(Math.round(price) + configs.range, configs.amount);
                                         if (order.status === 'FILLED' && position[1].positionAmt < 0)
                                             binance.futuresCancel(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
                                                 closeShort(Math.round(Math.min(price, position[1].entryPrice)) - configs.range, 0 - position[1].positionAmt);
@@ -375,14 +368,7 @@ async function tick() {
                                     if (order.status === 'NEW') {
                                         if (price - configs.range * 2 > order.price && price - 5 < position[1].entryPrice)
                                             closeShort(Math.round(order.price) + configs.range, order.origQty);
-                                        //closeShort(Math.round(order.price) + configs.range, Math.max((order.origQty - configs.amount).toFixed(3), configs.amount));
                                     }
-                                    // else if (order.status === 'FILLED') {
-                                    //     closeShort(Math.round(price) - configs.range, Math.min(configs.amount, 0-position[1].positionAmt));
-                                    //     //closeShort(Math.round(price) - configs.range, Number(order.origQty) + configs.amount);
-                                    // } else {
-                                    //     closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, Math.min(configs.amount, 0-position[1].positionAmt));
-                                    // }
                                 });
                             }
                             // open short limit
@@ -411,7 +397,7 @@ async function tick() {
                                             openShortM(Math.round(price) - configs.range, order.origQty);
                                         }
                                     } else {
-                                        openShortM(Math.round(position[1].entryPrice > 0 && position[1].entryPrice < price ? position[1].entryPrice : price) - configs.range, configs.amount)
+                                        openShortM(Math.round(price) - configs.range, configs.amount);
                                         if (order.status === 'FILLED' && position[0].positionAmt > 0)
                                             binance.futuresCancel(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
                                                 closeLong(Math.round(Math.max(price, position[0].entryPrice)) + configs.range, position[0].positionAmt);
