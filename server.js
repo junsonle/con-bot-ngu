@@ -338,6 +338,10 @@ async function tick() {
                                     } else {
                                         openLong(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
                                     }
+                                    if (order.status === 'FILLED')
+                                        binance.futuresCancel(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
+                                            closeLong(Math.round(position[0].entryPrice) + configs.range, position[0].positionAmt);
+                                        });
                                 });
                             }
                             // open long market
@@ -386,6 +390,10 @@ async function tick() {
                                     } else {
                                         openShort(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
                                     }
+                                    if (order.status === 'FILLED')
+                                        binance.futuresCancel(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
+                                            closeShort(Math.round(position[1].entryPrice) - configs.range, 0 - position[1].positionAmt);
+                                        });
                                 });
                             }
                             //open short market
