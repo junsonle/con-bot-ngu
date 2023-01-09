@@ -12,10 +12,10 @@ process.env.UV_THREADPOOL_SIZE = 128;
 server.listen(port || 3000);
 
 const postgres = new Client({
-    user: 'bznnfglwutbcjf',
-    host: 'ec2-3-229-252-6.compute-1.amazonaws.com',
-    database: 'dcisecurskg7nf',
-    password: '58acdda7669a5493ae9d51f3751a4e5fefbbc592257e3383c2f716283042b186',
+    user: 'bot_hrbc_user',
+    host: 'dpg-cetta2g2i3mj6pjhara0-a.oregon-postgres.render.com',
+    database: 'bot_hrbc',
+    password: '1wNKUs2SEuKasHiHy9VuAkiS1TBjD3Bu',
     port: 5432,
     ssl: {
         rejectUnauthorized: false
