@@ -28,7 +28,7 @@ postgres.connect(function (err) {
 
 let binance;
 let ping = new Monitor({
-    website: 'http://localhost:3000',
+    website: 'https://con-bot-ngu.onrender.com',
     interval: 10 // minutes
 });
 
