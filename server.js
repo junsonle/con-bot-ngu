@@ -12,11 +12,11 @@ process.env.UV_THREADPOOL_SIZE = 128;
 server.listen(port || 3000);
 
 const postgres = new Client({
-    user: 'bot_hrbc_user',
-    host: 'dpg-cetta2g2i3mj6pjhara0-a.oregon-postgres.render.com',
-    database: 'bot_hrbc',
-    password: '1wNKUs2SEuKasHiHy9VuAkiS1TBjD3Bu',
-    port: 5432,
+    user: 'postgres',
+    host: 'containers-us-west-129.railway.app',
+    database: 'railway',
+    password: 'EEyYjqDn8J1HvBIxijVh',
+    port: 8050,
     ssl: {
         rejectUnauthorized: false
     }
@@ -28,7 +28,7 @@ postgres.connect(function (err) {
 
 let binance;
 let ping = new Monitor({
-    website: 'https://con-bot-ngu.up.railway.app',
+    website: 'https://www.google.com.vn',
     interval: 10 // minutes
 });
 
@@ -178,7 +178,7 @@ function openLongM(price, amount) {
 function serverSendMessage(message) {
     let mess = {
         value: message,
-        time: new Date().toLocaleString(),
+        time: new Date(),
         userId: 'server'
     };
     io.emit("serverSendMessage", mess);

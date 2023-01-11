@@ -1,18 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="Postgres Database" uuid="0e8e1d14-6a77-4d06-bc76-8612c1d8c234">
+    <data-source source="LOCAL" name="conbotngu" uuid="59de5e29-76cb-4f12-9881-f68f6bee9124">
       <driver-ref>postgresql</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.postgresql.Driver</jdbc-driver>
-      <jdbc-url>jdbc:postgresql://ec2-3-229-252-6.compute-1.amazonaws.com:5432/dcisecurskg7nf</jdbc-url>
-      <working-dir>$ProjectFileDir$</working-dir>
-    </data-source>
-    <data-source source="LOCAL" name="conbotngu" uuid="66dc70d1-1167-41ac-be46-ff37d6435fc1">
-      <driver-ref>postgresql</driver-ref>
-      <synchronize>true</synchronize>
-      <jdbc-driver>org.postgresql.Driver</jdbc-driver>
-      <jdbc-url>jdbc:postgresql://dpg-cetta2g2i3mj6pjhara0-a.oregon-postgres.render.com:5432/bot_hrbc</jdbc-url>
+      <jdbc-url>jdbc:postgresql://containers-us-west-129.railway.app:8050/railway</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>
