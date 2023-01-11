@@ -1,6 +1,5 @@
 const Binance = require('node-binance-api');
 const Express = require("express");
-const Monitor = require('ping-monitor');
 const {Client} = require('pg');
 const app = Express();
 const server = require("http").Server(app);
@@ -12,11 +11,11 @@ process.env.UV_THREADPOOL_SIZE = 128;
 server.listen(port || 3000);
 
 const postgres = new Client({
-    user: 'bznnfglwutbcjf',
-    host: 'ec2-3-229-252-6.compute-1.amazonaws.com',
-    database: 'dcisecurskg7nf',
-    password: '58acdda7669a5493ae9d51f3751a4e5fefbbc592257e3383c2f716283042b186',
-    port: 5432,
+    user: 'postgres',
+    host: 'containers-us-west-129.railway.app',
+    database: 'railway',
+    password: 'EEyYjqDn8J1HvBIxijVh',
+    port: 8050,
     ssl: {
         rejectUnauthorized: false
     }
@@ -27,10 +26,6 @@ postgres.connect(function (err) {
 });
 
 let binance;
-let ping = new Monitor({
-    website: 'https://con-bot-ngu.herokuapp.com',
-    interval: 20 // minutes
-});
 
 let configs = {
     id: 2,
@@ -262,11 +257,6 @@ io.on('connect', function (socket) {
             configs.amount = Number(data.amount);
             configs.range = Number(data.range);
 
-            if (configs.run)
-                ping.restart();
-            else
-                ping.stop();
-
             console.log('Configs: ', data);
             console.log("Trade " + (configs.run ? 'on' : 'off'));
             socket.emit("configs", data);
@@ -287,14 +277,6 @@ app.get("/", function (req, res) {
 });
 
 app.get('/robot.png', (req, res) => res.status(200));
-
-ping.on('up', function (res, state) {
-    console.log('Service is up');
-});
-
-ping.on('stop', function (res, state) {
-    console.log('Service is stop');
-});
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -493,8 +475,7 @@ async function main() {
                 serverSendMessage("Trade " + (configs.run ? 'on' : 'off'));
                 serverSendBalance();
                 tick();
-            } else
-                ping.stop();
+            }
         });
     } catch (e) {
         console.log(e.code);
