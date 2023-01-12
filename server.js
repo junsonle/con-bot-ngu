@@ -28,7 +28,7 @@ postgres.connect(function (err) {
 let binance;
 
 let configs = {
-    id: 2,
+    id: 1,
     symbol: 'BTCBUSD',
     run: false,
     amount: 0.001,
