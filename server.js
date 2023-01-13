@@ -410,7 +410,7 @@ async function tick() {
                 });
             } else if (orderLongId !== -1 && orderShortId !== -1 && orderLongMId !== -1 && orderShortMId !== -1 && closeLongId !== -1 && closeShortId !== -1)
                 await binance.futuresOpenOrders(configs.symbol).then(orders => {
-                    if (orders) {
+                    if (orders.length > 0) {
                         orders.forEach(order => {
                             switch (order.orderId) {
                                 case orderLongId:
