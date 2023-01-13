@@ -287,6 +287,7 @@ async function tick() {
         await binance.futuresPrices().then(async prices => {
             if (price !== prices[configs.symbol]) {
                 price = prices[configs.symbol];
+                console.log(price);
                 io.emit("price", `${configs.symbol}: ${price}`);
                 await binance.futuresBalance().then(values => {
                     if (values.length > 0) {
