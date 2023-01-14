@@ -187,6 +187,7 @@ function serverSendMessage(message) {
 
 function serverSendBalance() {
     binance.futuresBalance().then(values => {
+        console.log(values);
         if (values.length > 0) {
             let mess = '';
             for (let value of values.filter(f => f.balance != 0)) {
@@ -194,7 +195,7 @@ function serverSendBalance() {
             }
             serverSendMessage(mess);
         }
-    });
+    }).catch(console.log);
 }
 
 io.on('connect', function (socket) {
