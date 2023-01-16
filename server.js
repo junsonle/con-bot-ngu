@@ -187,7 +187,7 @@ function serverSendMessage(message) {
 
 function serverSendBalance() {
     binance.futuresBalance().then(values => {
-        console.log(values);
+//        console.log(values);
         if (values.length > 0) {
             let mess = '';
             for (let value of values.filter(f => f.balance != 0)) {
@@ -288,7 +288,7 @@ async function tick() {
         await binance.futuresPrices().then(async prices => {
             if (price !== prices[configs.symbol]) {
                 price = prices[configs.symbol];
-                console.log(price);
+//                console.log(price);
                 io.emit("price", `${configs.symbol}: ${price}`);
                 await binance.futuresBalance().then(values => {
                     if (values.length > 0) {
