@@ -1,5 +1,6 @@
 const Binance = require('node-binance-api');
 const Express = require("express");
+const Monitor = require('ping-monitor');
 const {Client} = require('pg');
 const app = Express();
 const server = require("http").Server(app);
@@ -26,6 +27,10 @@ postgres.connect(function (err) {
 });
 
 let binance;
+let ping = new Monitor({
+    website: 'https://con-bot-ngu-zjln.onrender.com',
+    interval: 10 // minutes
+});
 
 let configs = {
     id: 1,
@@ -257,6 +262,11 @@ io.on('connect', function (socket) {
             configs.amount = Number(data.amount);
             configs.range = Number(data.range);
 
+            if (configs.run)
+                ping.restart();
+            else
+                ping.stop();
+
             console.log('Configs: ', data);
             console.log("Trade " + (configs.run ? 'on' : 'off'));
             socket.emit("configs", data);
@@ -277,6 +287,14 @@ app.get("/", function (req, res) {
 });
 
 app.get('/robot.png', (req, res) => res.status(200));
+
+ping.on('up', function (res, state) {
+    console.log('Service is up');
+});
+
+ping.on('stop', function (res, state) {
+    console.log('Service is stop');
+});
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -474,7 +492,8 @@ async function main() {
                 serverSendMessage("Trade " + (configs.run ? 'on' : 'off'));
                 serverSendBalance();
                 tick();
-            }
+            } else
+                ping.stop();
         });
     } catch (e) {
         console.log(e.code);
