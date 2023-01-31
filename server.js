@@ -28,7 +28,7 @@ postgres.connect(function (err) {
 
 let binance;
 let ping = new Monitor({
-    website: 'https://www.google.com.vn',
+    website: 'https://con-bot-ngu-zjln.onrender.com',
     interval: 10 // minutes
 });
 
@@ -278,11 +278,11 @@ io.on('connect', function (socket) {
 
 });
 
-app.get("/", function (req, res) {
-    res.render("index");
-});
-
-app.get('/robot.png', (req, res) => res.status(200));
+// app.get("/", function (req, res) {
+//     res.render("index");
+// });
+//
+// app.get('/robot.png', (req, res) => res.status(200));
 
 ping.on('up', function (res, state) {
     console.log('Service is up');
