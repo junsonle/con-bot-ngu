@@ -86,11 +86,12 @@
         }
     </style>
     <script>
-        const socket = io("https://con-bot-ngu-zjln.onrender.com");
+        const socket = io("https://con-bot-ngu.up.railway.app");
 
-        let run;
+        let configs;
 
-        socket.on("configs", function (configs) {
+        socket.on("configs", function (values) {
+            configs = values;
             console.log(configs);
             $("#symbol").val(configs.symbol).prop('disabled', configs.run);
             $("#amount").val(configs.amount).prop('disabled', configs.run);
@@ -99,7 +100,6 @@
             $("#sideS").prop('checked', configs.short);
             $("#run").val(!configs.run ? 'ON' : 'OFF');
             $("#on").prop("checked", configs.run);
-            run = configs.run;
         });
 
         function updateScroll() {
@@ -138,8 +138,8 @@
         $(document).ready(function () {
             $("#run").click(function () {
                 socket.emit("run", {
-                    id: 2,
-                    run: !run,
+                    id: configs.id,
+                    run: !configs.run,
                     symbol: $("#symbol").val(),
                     amount: $("#amount").val(),
                     range: $("#range").val(),

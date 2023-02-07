@@ -28,7 +28,7 @@ postgres.connect(function (err) {
 
 let binance;
 let ping = new Monitor({
-    website: 'https://con-bot-ngu-zjln.onrender.com',
+    website: 'https://con-bot-ngu.up.railway.app',
     interval: 10 // minutes
 });
 
@@ -40,7 +40,6 @@ let configs = {
     range: 20,
     long: true,
     short: true,
-
 }
 let maxOrder = 10;
 let listMess = [];
