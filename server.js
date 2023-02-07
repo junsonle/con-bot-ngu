@@ -12,11 +12,11 @@ process.env.UV_THREADPOOL_SIZE = 128;
 server.listen(port || 3000);
 
 const postgres = new Client({
-    user: 'postgres',
-    host: 'containers-us-west-129.railway.app',
-    database: 'railway',
-    password: 'EEyYjqDn8J1HvBIxijVh',
-    port: 8050,
+    user: 'bot',
+    host: 'dpg-cfgvcb9a6gdvgkl9i1hg-a.frankfurt-postgres.render.com',
+    database: 'bot_k3zu',
+    password: 'XSX2LR61vQri7WUEQybgCzdTG1E3es6x',
+    port: 5432,
     ssl: {
         rejectUnauthorized: false
     }
