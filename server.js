@@ -324,7 +324,7 @@ async function tick() {
                                         //closeLong(Math.round(order.price) - configs.range, Math.max((order.origQty - configs.amount).toFixed(3), configs.amount));
                                     } else if (order.status === 'FILLED') {
                                         //closeLong(Math.round(price) + configs.range, Math.min(configs.amount, position[0].positionAmt));
-                                        closeLong(Math.round(price) + configs.range, Math.min(Number(order.origQty) + configs.amount, position[0].positionAmt));
+                                        closeLong(Math.round(price) + configs.range, Math.min(configs.amount, position[0].positionAmt));
                                     } else {
                                         closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range, configs.amount);
                                     }
@@ -379,7 +379,7 @@ async function tick() {
                                         //closeShort(Math.round(order.price) + configs.range, Math.max((order.origQty - configs.amount).toFixed(3), configs.amount));
                                     } else if (order.status === 'FILLED') {
                                         //closeShort(Math.round(price) - configs.range, Math.min(configs.amount, position[0].positionAmt));
-                                        closeShort(Math.round(price) - configs.range, Math.min(Number(order.origQty) + configs.amount, - position[1].positionAmt));
+                                        closeShort(Math.round(price) - configs.range, Math.min(configs.amount, - position[1].positionAmt));
                                     } else {
                                         closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, configs.amount);
                                     }
