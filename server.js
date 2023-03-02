@@ -8,7 +8,6 @@ const io = require('socket.io')(server);
 
 app.use(Express.static("./public"));
 const port = process.env.PORT;
-process.env.UV_THREADPOOL_SIZE = 128;
 server.listen(port || 3000);
 
 const postgres = new Client({
@@ -28,12 +27,12 @@ postgres.connect(function (err) {
 
 let binance;
 let ping = new Monitor({
-    website: 'https://con-bot-dot.onrender.com',
+    website: 'https://con-bot-ngu.onrender.com',
     interval: 10 // minutes
 });
 
 let configs = {
-    id: 2,
+    id: 3,
     symbol: 'BTCBUSD',
     run: false,
     amount: 0.001,
@@ -68,7 +67,7 @@ function closeShort(price, amount) {
         if (data[0].code)
             console.log(data[0]);
         closeShortId = data[0].orderId;
-    }).catch(console.log);
+    }).catch(e => console.log(e.code));
 }
 
 function closeLong(price, amount) {
@@ -89,7 +88,7 @@ function closeLong(price, amount) {
         if (data[0].code)
             console.log(data[0]);
         closeLongId = data[0].orderId;
-    }).catch(console.log);
+    }).catch(e => console.log(e.code));
 }
 
 function openShort(price, amount) {
@@ -110,7 +109,7 @@ function openShort(price, amount) {
         orderShortId = data[0].orderId;
         if (data[0].code)
             console.log(data[0]);
-    }).catch(console.log);
+    }).catch(e => console.log(e.code));
 }
 
 function openLong(price, amount) {
@@ -131,7 +130,7 @@ function openLong(price, amount) {
         orderLongId = data[0].orderId;
         if (data[0].code)
             console.log(data[0]);
-    }).catch(console.log);
+    }).catch(e => console.log(e.code));
 }
 
 function openShortM(price, amount) {
@@ -151,7 +150,7 @@ function openShortM(price, amount) {
         orderShortMId = data[0].orderId;
         if (data[0].code)
             console.log(data[0]);
-    }).catch(console.log);
+    }).catch(e => console.log(e.code));
 }
 
 function openLongM(price, amount) {
@@ -171,7 +170,7 @@ function openLongM(price, amount) {
         orderLongMId = data[0].orderId;
         if (data[0].code)
             console.log(data[0]);
-    }).catch(console.log);
+    }).catch(e => console.log(e.code));
 }
 
 function serverSendMessage(message) {
@@ -193,7 +192,7 @@ function serverSendBalance() {
             }
             serverSendMessage(mess);
         }
-    });
+    }).catch(e => console.log(e.code));
 }
 
 io.on('connect', function (socket) {
@@ -219,7 +218,7 @@ io.on('connect', function (socket) {
                     serverSendMessage('Done!');
                 } else
                     serverSendMessage('Error!');
-            });
+            }).catch(e => console.log(e.code));
         } else if (data.value === 'order') {
             binance.futuresOpenOrders(configs.symbol).then(values => {
                 if (values.length > 0)
@@ -231,7 +230,7 @@ io.on('connect', function (socket) {
                             ${data.price}`
                         );
                     });
-            });
+            }).catch(e => console.log(e.code));
         } else if (data.value === 'balance') {
             serverSendBalance();
         } else if (data.value === 'position') {
@@ -240,7 +239,7 @@ io.on('connect', function (socket) {
                 position.forEach(data => {
                     serverSendMessage(`${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
                 });
-            });
+            }).catch(e => console.log(e.code));
         }
     });
 
@@ -309,7 +308,7 @@ async function tick() {
                             io.emit("balance", `${Number(value.balance).toFixed(2)} ${value.crossUnPnl > 0 ? '+' : ''}${Number(value.crossUnPnl).toFixed(2)} | BUSD`);
                         });
                     }
-                });
+                }).catch(e => console.log(e.code));
 
                 await binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
                     if (position) {
@@ -326,9 +325,9 @@ async function tick() {
                                         //closeLong(Math.round(price) + configs.range, Math.min(configs.amount, position[0].positionAmt));
                                         closeLong(Math.round(price) + configs.range, Math.min(configs.amount, position[0].positionAmt));
                                     } else {
-                                        closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range, configs.amount);
+                                        closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range, position[0].positionAmt);
                                     }
-                                });
+                                }).catch(e => console.log(e.code));
                             }
                             // open long limit
                             if (orderLongId !== -1) {
@@ -348,7 +347,7 @@ async function tick() {
                                     if (order.status === 'FILLED')
                                         closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
                                     // closeLong(Math.round(position[0].entryPrice) + configs.range, position[0].positionAmt);
-                                });
+                                }).catch(e => console.log(e.code));
                             }
                             // open long market
                             if (orderLongMId !== -1) {
@@ -363,7 +362,7 @@ async function tick() {
                                         // openLongM(Math.round(position[0].entryPrice > price ? position[0].entryPrice : price) + configs.range, configs.amount);
                                         openLongM(Math.round(topLong > price ? topLong : price) + configs.range, configs.amount);
                                     }
-                                });
+                                }).catch(e => console.log(e.code));
                             }
                         }
 
@@ -381,9 +380,9 @@ async function tick() {
                                         //closeShort(Math.round(price) - configs.range, Math.min(configs.amount, position[0].positionAmt));
                                         closeShort(Math.round(price) - configs.range, Math.min(configs.amount, - position[1].positionAmt));
                                     } else {
-                                        closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, configs.amount);
+                                        closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, - position[1].positionAmt);
                                     }
-                                });
+                                }).catch(e => console.log(e.code));
                             }
                             // open short limit
                             if (orderShortId !== -1) {
@@ -403,7 +402,7 @@ async function tick() {
                                     if (order.status === 'FILLED')
                                         closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
                                     // closeShort(Math.round(position[1].entryPrice) - configs.range, 0 - position[1].positionAmt);
-                                });
+                                }).catch(e => console.log(e.code));
                             }
                             //open short market
                             if (orderShortMId !== -1) {
@@ -418,11 +417,11 @@ async function tick() {
                                         //openShortM(Math.round(position[1].entryPrice > 0 && position[1].entryPrice < price ? position[1].entryPrice : price) - configs.range, configs.amount);
                                         openShortM(Math.round(position[1].entryPrice > 0 && botShort < price ? botShort : price) - configs.range, configs.amount);
                                     }
-                                });
+                                }).catch(e => console.log(e.code));
                             }
                         }
                     }
-                });
+                }).catch(e => console.log(e.code));
             } else if (orderLongId !== -1 && orderShortId !== -1 && orderLongMId !== -1 && orderShortMId !== -1 && closeLongId !== -1 && closeShortId !== -1)
                 await binance.futuresOpenOrders(configs.symbol).then(orders => {
                     if (orders.length > 0) {
@@ -447,8 +446,8 @@ async function tick() {
                             }
                         });
                     }
-                });
-        });
+                }).catch(e => console.log(e.code));
+        }).catch(e => console.log(e.code));
         await delay(200);
     }
 }
