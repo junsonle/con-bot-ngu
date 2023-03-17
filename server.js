@@ -12,7 +12,7 @@ app.use(Express.static("./public"));
 app.set("views", "./public");
 const port = process.env.PORT;
 const botId = process.env.ID;
-const link = process.env.LINK;
+const url = process.env.url;
 server.listen(port || 3000);
 
 const YOUR_TOKEN = "6215665987:AAEd_mSldUN39BvsNhmksVNORAromu5RZNY";
@@ -37,7 +37,7 @@ let binance;
 let chatId = 1312093738;
 
 let ping = new Monitor({
-    website: 'https://con-bot-ngu-teh2.onrender.com',
+    website: url,
     interval: 10 // minutes
 });
 
@@ -332,7 +332,7 @@ bot.command("position", async (ctx) => {
 });
 
 app.get("/", function (req, res) {
-    res.render("index.ejs", {link: link});
+    res.render("index.ejs", {link: url});
 });
 
 app.get('/robot.png', (req, res) => res.status(200));
