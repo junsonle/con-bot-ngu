@@ -7,7 +7,7 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <style>
         .container {
-            float: left;
+            /*float: left;*/
             padding: 10px;
             width: fit-content;
             /*border-radius: 10px;*/
@@ -86,7 +86,7 @@
         }
     </style>
     <script>
-        const socket = io("https://con-bot-ngu-teh2.onrender.com");
+        const socket = io(process.env.LINK);
 
         let configs;
 
@@ -179,44 +179,46 @@
     </script>
 </head>
 <body>
-<div class="container">
-    <input id="on" type="radio" style="float: left; width: 15px; height: 15px"/>
-    <h4 id="price" style="margin: 10px">Messenger</h4>
-    <label id="balance">BUSD</label>
-    <form id="form">
-        <table>
-            <tr>
-                <td><label>Symbol</label></td>
-                <td><input id="symbol" type="text" name="symbol" placeholder="symbol"/></td>
-            </tr>
-            <tr>
-                <td><label>Amount</label></td>
-                <td><input id="amount" type="text" name="amount" placeholder="amount"/></td>
-            </tr>
-            <tr>
-                <td><label>Range</label></td>
-                <td><input id="range" type="text" name="range" placeholder="range"/></td>
-            </tr>
-            <tr>
-                <td><label>Side</label></td>
-                <td>
-                    <label style="background: rgb(14, 203, 129); color: white"><input id="sideL" type="checkbox"
-                                                                                      name="sideL"/> Long </label>
-                    <label style="background: rgb(246, 70, 93); color: white"><input id="sideS" type="checkbox"
-                                                                                     name="sideS"/> Short </label>
-                </td>
-            </tr>
-        </table>
-        <br/>
-        <!--        <label>ON/OFF: </label>-->
-        <input id="run" type="button" value="ON" name="run"/>
-        <input id="clear" type="button" value="CLEAR" name="clear"/>
-    </form>
-</div>
-<div class="container">
-    <input id="message" type="text" name="mess" placeholder="message"/>
-    <input id="chat" type="button" value="send" name="chat"/><br>
-    <label id="messagesBox"></label>
-</div>
+<center>
+    <div class="container">
+        <input id="on" type="radio" style="float: left; width: 15px; height: 15px"/>
+        <h4 id="price" style="margin: 10px">Messenger</h4>
+        <label id="balance">BUSD</label>
+        <form id="form">
+            <table>
+                <tr>
+                    <td><label>Symbol</label></td>
+                    <td><input id="symbol" type="text" name="symbol" placeholder="symbol"/></td>
+                </tr>
+                <tr>
+                    <td><label>Amount</label></td>
+                    <td><input id="amount" type="text" name="amount" placeholder="amount"/></td>
+                </tr>
+                <tr>
+                    <td><label>Range</label></td>
+                    <td><input id="range" type="text" name="range" placeholder="range"/></td>
+                </tr>
+                <tr>
+                    <td><label>Side</label></td>
+                    <td>
+                        <label style="background: rgb(14, 203, 129); color: white"><input id="sideL" type="checkbox"
+                                                                                          name="sideL"/> Long </label>
+                        <label style="background: rgb(246, 70, 93); color: white"><input id="sideS" type="checkbox"
+                                                                                         name="sideS"/> Short </label>
+                    </td>
+                </tr>
+            </table>
+            <br/>
+            <!--        <label>ON/OFF: </label>-->
+            <input id="run" type="button" value="ON" name="run"/>
+            <input id="clear" type="button" value="CLEAR" name="clear"/>
+        </form>
+    </div>
+</center>
+<!--<div class="container">-->
+<!--    <input id="message" type="text" name="mess" placeholder="message"/>-->
+<!--    <input id="chat" type="button" value="send" name="chat"/><br>-->
+<!--    <label id="messagesBox"></label>-->
+<!--</div>-->
 </body>
 </html>

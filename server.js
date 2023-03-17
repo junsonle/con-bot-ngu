@@ -2,13 +2,19 @@ const Binance = require('node-binance-api');
 const Express = require("express");
 const Monitor = require('ping-monitor');
 const {Client} = require('pg');
+const {Telegraf} = require("telegraf");
+
 const app = Express();
 const server = require("http").Server(app);
 const io = require('socket.io')(server);
 
 app.use(Express.static("./public"));
 const port = process.env.PORT;
+const botId = process.env.ID;
 server.listen(port || 3000);
+
+const YOUR_TOKEN = "6215665987:AAEd_mSldUN39BvsNhmksVNORAromu5RZNY";
+const bot = new Telegraf(YOUR_TOKEN);
 
 const postgres = new Client({
     user: 'bot',
@@ -26,13 +32,15 @@ postgres.connect(function (err) {
 });
 
 let binance;
+let chatId = 1312093738;
+
 let ping = new Monitor({
-    website: 'https://con-bot-ngu-teh2.onrender.com',
+    website: process.env.LINK || 'http://localhost:3000',
     interval: 10 // minutes
 });
 
 let configs = {
-    id: 3,
+    id: botId || 2,
     symbol: 'BTCBUSD',
     run: false,
     amount: 0.001,
@@ -195,6 +203,11 @@ function serverSendBalance() {
     }).catch(e => console.log(e.code));
 }
 
+bot.start((ctx) => {
+    chatId = ctx.message.chat.id;
+    ctx.reply("Welcome");
+});
+
 io.on('connect', function (socket) {
 
     //console.log(socket.id + " Da ket noi!");
@@ -261,6 +274,8 @@ io.on('connect', function (socket) {
             else
                 ping.stop();
 
+            bot.telegram.sendMessage(chatId, "Trade " + (configs.run ? 'on' : 'off'));
+
             console.log('Configs: ', data);
             console.log("Trade " + (configs.run ? 'on' : 'off'));
             socket.emit("configs", data);
@@ -274,6 +289,46 @@ io.on('connect', function (socket) {
         console.log(socket.id + " Da ngat ket noi!");
     });
 
+});
+
+bot.on("message", async (ctx) => {
+    const message = ctx.update.message.text.toLowerCase();
+    // console.log(ctx.message.chat.id);
+    if (message === 'clear') {
+        binance.futuresCancelAll(configs.symbol).then(value => {
+            if (value.code === 200) {
+                orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
+                ctx.reply('Done!');
+            } else
+                ctx.reply('Error!');
+        }).catch(e => console.log(e.code));
+    } else if (message === 'order') {
+        binance.futuresOpenOrders(configs.symbol).then(values => {
+            if (values.length > 0)
+                values.forEach(data => {
+                    ctx.reply(
+                        `${configs.symbol}: ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | ${data.positionSide} | ${data.price}`
+                    );
+                });
+        }).catch(e => console.log(e.code));
+    } else if (message === 'balance') {
+        binance.futuresBalance().then(values => {
+            if (values.length > 0) {
+                let mess = '';
+                for (let value of values.filter(f => f.balance != 0)) {
+                    mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl} \n`;
+                }
+                ctx.reply(mess);
+            }
+        }).catch(e => console.log(e.code));
+    } else if (message === 'position') {
+        binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
+            if (position.length > 0)
+                position.forEach(data => {
+                    ctx.reply(`${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
+                });
+        }).catch(e => console.log(e.code));
+    }
 });
 
 app.get("/", function (req, res) {
@@ -440,7 +495,7 @@ async function tick() {
                                 case closeShortId:
                                     break;
                                 default:
-                                    //console.log('CANCEL ORDER ' + (order.price - order.stopPrice) + " " + order.origQty);
+                                    console.log('CANCEL ORDER ' + (order.price - order.stopPrice) + " " + order.origQty);
                                     binance.futuresCancel(configs.symbol, {orderId: `${order.orderId}`});
                                     break;
                             }
@@ -482,6 +537,9 @@ async function main() {
             if (err) throw err;
             configs = res.rows[0];
             if (configs.run) {
+
+                bot.telegram.sendMessage(chatId, "Trade " + (configs.run ? 'on' : 'off'));
+
                 console.log("Trade " + (configs.run ? 'on' : 'off'));
                 serverSendMessage("Trade " + (configs.run ? 'on' : 'off'));
                 serverSendBalance();
@@ -494,5 +552,7 @@ async function main() {
         serverSendMessage(e.code);
     }
 }
+
+bot.launch();
 
 main();
