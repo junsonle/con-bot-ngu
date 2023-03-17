@@ -37,12 +37,12 @@ let binance;
 let chatId = 1312093738;
 
 let ping = new Monitor({
-    website: link,
+    website: 'https://con-bot-ngu-teh2.onrender.com',
     interval: 10 // minutes
 });
 
 let configs = {
-    id: botId || 3,
+    id: botId,
     symbol: 'BTCBUSD',
     run: false,
     amount: 0.001,
