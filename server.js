@@ -37,7 +37,7 @@ let binance;
 let chatId = 1312093738;
 
 let ping = new Monitor({
-    website: link || 'http://localhost:3000',
+    website: link,
     interval: 10 // minutes
 });
 
