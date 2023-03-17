@@ -332,7 +332,7 @@ bot.command("position", async (ctx) => {
 });
 
 app.get("/", function (req, res) {
-    res.render("index.ejs", {link: url});
+    res.render("index.ejs", {url: url});
 });
 
 app.get('/robot.png', (req, res) => res.status(200));
