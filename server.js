@@ -9,8 +9,10 @@ const server = require("http").Server(app);
 const io = require('socket.io')(server);
 
 app.use(Express.static("./public"));
+app.set("views", "./public");
 const port = process.env.PORT;
 const botId = process.env.ID;
+const link = process.env.LINK;
 server.listen(port || 3000);
 
 const YOUR_TOKEN = "6215665987:AAEd_mSldUN39BvsNhmksVNORAromu5RZNY";
@@ -35,12 +37,12 @@ let binance;
 let chatId = 1312093738;
 
 let ping = new Monitor({
-    website: process.env.LINK || 'http://localhost:3000',
+    website: link || 'http://localhost:3000',
     interval: 10 // minutes
 });
 
 let configs = {
-    id: botId || 2,
+    id: botId || 3,
     symbol: 'BTCBUSD',
     run: false,
     amount: 0.001,
@@ -203,11 +205,6 @@ function serverSendBalance() {
     }).catch(e => console.log(e.code));
 }
 
-bot.start((ctx) => {
-    chatId = ctx.message.chat.id;
-    ctx.reply("Welcome");
-});
-
 io.on('connect', function (socket) {
 
     //console.log(socket.id + " Da ket noi!");
@@ -291,48 +288,51 @@ io.on('connect', function (socket) {
 
 });
 
-bot.on("message", async (ctx) => {
-    const message = ctx.update.message.text.toLowerCase();
-    // console.log(ctx.message.chat.id);
-    if (message === 'clear') {
-        binance.futuresCancelAll(configs.symbol).then(value => {
-            if (value.code === 200) {
-                orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
-                ctx.reply('Done!');
-            } else
-                ctx.reply('Error!');
-        }).catch(e => console.log(e.code));
-    } else if (message === 'order') {
-        binance.futuresOpenOrders(configs.symbol).then(values => {
-            if (values.length > 0)
-                values.forEach(data => {
-                    ctx.reply(
-                        `${configs.symbol}: ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | ${data.positionSide} | ${data.price}`
-                    );
-                });
-        }).catch(e => console.log(e.code));
-    } else if (message === 'balance') {
-        binance.futuresBalance().then(values => {
-            if (values.length > 0) {
-                let mess = '';
-                for (let value of values.filter(f => f.balance != 0)) {
-                    mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl} \n`;
-                }
-                ctx.reply(mess);
+bot.start((ctx) => {
+    chatId = ctx.message.chat.id;
+    ctx.reply("Welcome to bot");
+});
+bot.command("clear", async (ctx) => {
+    binance.futuresCancelAll(configs.symbol).then(value => {
+        if (value.code === 200) {
+            orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
+            ctx.reply('Done!');
+        } else
+            ctx.reply('Error!');
+    }).catch(e => console.log(e.code));
+});
+bot.command("order", async (ctx) => {
+    binance.futuresOpenOrders(configs.symbol).then(values => {
+        if (values.length > 0)
+            values.forEach(data => {
+                ctx.reply(
+                    `${configs.symbol}: ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | ${data.positionSide} | ${data.price}`
+                );
+            });
+    }).catch(e => console.log(e.code));
+});
+bot.command("balance", async (ctx) => {
+    binance.futuresBalance().then(values => {
+        if (values.length > 0) {
+            let mess = '';
+            for (let value of values.filter(f => f.balance != 0)) {
+                mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl} \n`;
             }
-        }).catch(e => console.log(e.code));
-    } else if (message === 'position') {
-        binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
-            if (position.length > 0)
-                position.forEach(data => {
-                    ctx.reply(`${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
-                });
-        }).catch(e => console.log(e.code));
-    }
+            ctx.reply(mess);
+        }
+    }).catch(e => console.log(e.code));
+});
+bot.command("position", async (ctx) => {
+    binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
+        if (position.length > 0)
+            position.forEach(data => {
+                ctx.reply(`${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
+            });
+    }).catch(e => console.log(e.code));
 });
 
 app.get("/", function (req, res) {
-    res.render("index");
+    res.render("index.ejs", {link: link});
 });
 
 app.get('/robot.png', (req, res) => res.status(200));
