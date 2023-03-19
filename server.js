@@ -9,7 +9,6 @@ const server = require("http").Server(app);
 const io = require('socket.io')(server);
 
 app.use(Express.static("./public"));
-app.set("views", "./public");
 const port = process.env.PORT;
 const botId = process.env.ID;
 const url = process.env.url;
