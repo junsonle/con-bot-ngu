@@ -11,7 +11,6 @@ const io = require('socket.io')(server);
 app.use(Express.static("./public"));
 const port = process.env.PORT;
 const botId = process.env.ID;
-const url = process.env.url;
 server.listen(port || 3000);
 
 const YOUR_TOKEN = "6215665987:AAEd_mSldUN39BvsNhmksVNORAromu5RZNY";
@@ -36,7 +35,7 @@ let binance;
 let chatId = 1312093738;
 
 let ping = new Monitor({
-    website: url,
+    website: 'https://con-bot-ngu-8oy7.onrender.com',
     interval: 10 // minutes
 });
 
@@ -331,7 +330,7 @@ bot.command("position", async (ctx) => {
 });
 
 app.get("/", function (req, res) {
-    res.render("index.ejs", {url: url});
+    res.render("index");
 });
 
 app.get('/robot.png', (req, res) => res.status(200));
