@@ -12,8 +12,8 @@ app.use(bodyParser.urlencoded({extended: false}));
 app.use(bodyParser.json());
 
 const port = process.env.PORT;
-const botId = process.env.ID || 2;
-server.listen(port || 3001);
+const botId = process.env.ID;
+server.listen(port || 3000);
 
 const YOUR_TOKEN = "6215665987:AAEd_mSldUN39BvsNhmksVNORAromu5RZNY";
 const bot = new Telegraf(YOUR_TOKEN);
