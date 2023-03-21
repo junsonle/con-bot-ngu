@@ -98,7 +98,7 @@
             $("#on").prop("checked", configs.run);
         }
 
-        fetch("https://con-bot-dot.onrender.com/configs", {method : "GET"})
+        fetch("http://localhost:3000/configs", {method : "GET"})
             .then(async (response) => {
                 configs = await response.json();
                 setForm(configs);
@@ -116,7 +116,7 @@
                     long: $("#sideL").is(':checked'),
                     short: $("#sideS").is(':checked'),
                 };
-                fetch("https://con-bot-dot.onrender.com/run", {
+                fetch("http://localhost:3000/run", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
@@ -136,6 +136,7 @@
 <center>
     <div class="container">
         <input id="on" type="radio" style="float: left; width: 15px; height: 15px"/>
+<!--        <input id="reload" type="button" style="float: right; width: 20px; height: 20px"/>-->
         <h4 id="price" style="margin: 10px">Messenger</h4>
         <label id="balance">BUSD</label>
         <form id="form">

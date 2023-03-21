@@ -5,14 +5,14 @@ const {Telegraf} = require("telegraf");
 const bodyParser = require('body-parser');
 
 const app = Express();
-const server = require("http").Server(app);
+const server = require("https").Server(app);
 
 app.use(Express.static("./public"));
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(bodyParser.json());
 
 const port = process.env.PORT;
-const botId = process.env.ID;
+const botId = process.env.ID || 2;
 server.listen(port || 3000);
 
 const YOUR_TOKEN = "6215665987:AAEd_mSldUN39BvsNhmksVNORAromu5RZNY";
