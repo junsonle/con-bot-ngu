@@ -86,6 +86,7 @@
     </style>
     <script>
 
+        const url = '<%=url%>';
         let configs;
 
         function setForm (configs) {
@@ -98,7 +99,7 @@
             $("#on").prop("checked", configs.run);
         }
 
-        fetch("http://3.218.141.200:3000/configs", {method : "GET"})
+        fetch(url + "/configs", {method : "GET"})
             .then(async (response) => {
                 configs = await response.json();
                 setForm(configs);
@@ -116,7 +117,7 @@
                     long: $("#sideL").is(':checked'),
                     short: $("#sideS").is(':checked'),
                 };
-                fetch("http://3.218.141.200:3000/run", {
+                fetch(url + "/run", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"

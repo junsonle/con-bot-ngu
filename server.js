@@ -6,17 +6,19 @@ const bodyParser = require('body-parser');
 
 const app = Express();
 const server = require("http").Server(app);
+require('dotenv').config();
+app.set("view engine", "ejs").set("views", "./public");
 
 app.use(Express.static("./public"));
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(bodyParser.json());
 
 const port = process.env.PORT;
-const botId = process.env.ID || 2;
+const id = process.env.ID;
+const url = process.env.URL;
 server.listen(port || 3000);
 
-const YOUR_TOKEN = "6215665987:AAEd_mSldUN39BvsNhmksVNORAromu5RZNY";
-const bot = new Telegraf(YOUR_TOKEN);
+const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
 const postgres = new Client({
     user: 'bot',
@@ -34,7 +36,7 @@ postgres.connect(function (err) {
 });
 
 let binance;
-let chatId = 1312093738;
+let chatId = process.env.TELEGRAM_ID;
 
 let configs = {}
 let maxOrder = 10;
@@ -178,7 +180,7 @@ bot.command('run', async (ctx) => {
     configs.run = !configs.run;
     postgres.query(`update config
                     set run=${configs.run}
-                    where id = ${botId};`, async (err, res) => {
+                    where id = ${id};`, async (err, res) => {
         if (err) throw err;
 
         ctx.reply("Trade " + (configs.run ? 'on' : 'off'));
@@ -189,7 +191,7 @@ bot.command('run', async (ctx) => {
     });
 });
 bot.command("web", async (ctx) => {
-    ctx.replyWithHTML("index");
+    ctx.reply(url);
 });
 bot.command("price", async (ctx) => {
     binance.futuresPrices().then(prices => {
@@ -236,13 +238,13 @@ bot.command("position", async (ctx) => {
 });
 
 app.get("/", function (req, res) {
-    res.render("index");
+    res.render("index", {url: url});
 });
 
 app.get("/configs", function (req, res) {
     postgres.query(`select *
                     from config
-                    where id = ${botId};`, (err, res) => {
+                    where id = ${id};`, (err, res) => {
         if (err) throw err;
         configs = res.rows[0];
     });
@@ -257,9 +259,9 @@ app.post("/run", function (req, res) {
                         range=${data.range},
                         long=${data.long},
                         short=${data.short}
-                    where id = ${botId};`, async (err, res) => {
+                    where id = ${id};`, async (err, res) => {
         if (err) throw err;
-        configs = {id: botId, ...data};
+        configs = {id: id, ...data};
         configs.amount = Number(data.amount);
         configs.range = Number(data.range);
 
@@ -431,7 +433,7 @@ async function tick() {
 async function main() {
     await postgres.query(`select *
                           from binance
-                          where id = ${botId};`, (err, res) => {
+                          where id = ${id};`, (err, res) => {
         if (res.rows[0].testnet)
             binance = new Binance().options({
                 APIKEY: `${res.rows[0].key}`,
@@ -453,7 +455,7 @@ async function main() {
 
     await postgres.query(`select *
                           from config
-                          where id = ${botId};`, (err, res) => {
+                          where id = ${id};`, (err, res) => {
         if (err) throw err;
         configs = res.rows[0];
         if (configs.run) {
