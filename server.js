@@ -174,27 +174,28 @@ bot.start((ctx) => {
     ctx.reply("Welcome to bot");
 });
 
-// bot.command('run', async (ctx) => {
-//
-//     postgres.query(`update config
-//                         set run=${data.run},
-//                             amount=${data.amount},
-//                             range=${data.range},
-//                             long=${data.long},
-//                             short=${data.short}
-//                         where id = ${configs.id};`, async (err, res) => {
-//         if (err) throw err;
-//         configs = data;
-//         configs.amount = Number(data.amount);
-//         configs.range = Number(data.range);
-//
-//         bot.telegram.sendMessage(chatId, "Trade " + (configs.run ? 'on' : 'off'));
-//
-//         console.log('Configs: ', data);
-//         console.log("Trade " + (configs.run ? 'on' : 'off'));
-//         await tick();
-//     });
-// });
+bot.command('run', async (ctx) => {
+    configs.run = !configs.run;
+    postgres.query(`update config
+                    set run=${configs.run}
+                    where id = ${botId};`, async (err, res) => {
+        if (err) throw err;
+
+        ctx.reply("Trade " + (configs.run ? 'on' : 'off'));
+
+        console.log('Configs: ', configs);
+        console.log("Trade " + (configs.run ? 'on' : 'off'));
+        await tick();
+    });
+});
+bot.command("web", async (ctx) => {
+    ctx.replyWithHTML("index");
+});
+bot.command("price", async (ctx) => {
+    binance.futuresPrices().then(prices => {
+        ctx.reply(prices[configs.symbol]);
+    });
+});
 bot.command("clear", async (ctx) => {
     binance.futuresCancelAll(configs.symbol).then(value => {
         if (value.code === 200) {
@@ -428,45 +429,41 @@ async function tick() {
 }
 
 async function main() {
-    try {
-        await postgres.query(`select *
-                              from binance
-                              where id = ${botId};`, (err, res) => {
-            if (res.rows[0].testnet)
-                binance = new Binance().options({
-                    APIKEY: `${res.rows[0].key}`,
-                    APISECRET: `${res.rows[0].secret}`,
-                    // useServerTime: true,
-                    test: true,
-                    urls: {
-                        base: 'https://testnet.binance.vision/api/',
-                        combineStream: 'wss://testnet.binance.vision/stream?streams=',
-                        stream: 'wss://testnet.binance.vision/ws/'
-                    }
-                });
-            else
-                binance = new Binance().options({
-                    APIKEY: `${res.rows[0].key}`,
-                    APISECRET: `${res.rows[0].secret}`
-                });
-        });
+    await postgres.query(`select *
+                          from binance
+                          where id = ${botId};`, (err, res) => {
+        if (res.rows[0].testnet)
+            binance = new Binance().options({
+                APIKEY: `${res.rows[0].key}`,
+                APISECRET: `${res.rows[0].secret}`,
+                // useServerTime: true,
+                test: true,
+                urls: {
+                    base: 'https://testnet.binance.vision/api/',
+                    combineStream: 'wss://testnet.binance.vision/stream?streams=',
+                    stream: 'wss://testnet.binance.vision/ws/'
+                }
+            });
+        else
+            binance = new Binance().options({
+                APIKEY: `${res.rows[0].key}`,
+                APISECRET: `${res.rows[0].secret}`
+            });
+    });
 
-        await postgres.query(`select *
-                              from config
-                              where id = ${botId};`, (err, res) => {
-            if (err) throw err;
-            configs = res.rows[0];
-            if (configs.run) {
+    await postgres.query(`select *
+                          from config
+                          where id = ${botId};`, (err, res) => {
+        if (err) throw err;
+        configs = res.rows[0];
+        if (configs.run) {
 
-                bot.telegram.sendMessage(chatId, "Trade " + (configs.run ? 'on' : 'off'));
+            bot.telegram.sendMessage(chatId, "Trade " + (configs.run ? 'on' : 'off'));
 
-                console.log("Trade " + (configs.run ? 'on' : 'off'));
-                tick();
-            }
-        });
-    } catch (e) {
-        console.log(e.code);
-    }
+            console.log("Trade " + (configs.run ? 'on' : 'off'));
+            tick();
+        }
+    });
 }
 
 bot.launch();
