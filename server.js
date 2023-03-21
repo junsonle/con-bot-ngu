@@ -175,7 +175,6 @@ bot.start((ctx) => {
     chatId = ctx.message.chat.id;
     ctx.reply("Welcome to bot");
 });
-
 bot.command('run', async (ctx) => {
     configs.run = !configs.run;
     postgres.query(`update config
@@ -196,7 +195,7 @@ bot.command("web", async (ctx) => {
 bot.command("price", async (ctx) => {
     binance.futuresPrices().then(prices => {
         ctx.reply(prices[configs.symbol]);
-    });
+    }).catch(e => console.log(e.code));
 });
 bot.command("clear", async (ctx) => {
     binance.futuresCancelAll(configs.symbol).then(value => {
