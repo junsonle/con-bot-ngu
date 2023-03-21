@@ -5,7 +5,7 @@ const {Telegraf} = require("telegraf");
 const bodyParser = require('body-parser');
 
 const app = Express();
-const server = require("https").Server(app);
+const server = require("http").Server(app);
 
 app.use(Express.static("./public"));
 app.use(bodyParser.urlencoded({extended: false}));
