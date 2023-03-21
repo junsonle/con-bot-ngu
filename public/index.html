@@ -98,7 +98,7 @@
             $("#on").prop("checked", configs.run);
         }
 
-        fetch("https://con-bot-ngu.cyclic.app/configs", {method : "GET"})
+        fetch("https://con-bot-dot.onrender.com/configs", {method : "GET"})
             .then(async (response) => {
                 configs = await response.json();
                 setForm(configs);
@@ -116,7 +116,7 @@
                     long: $("#sideL").is(':checked'),
                     short: $("#sideS").is(':checked'),
                 };
-                fetch("https://con-bot-ngu.cyclic.app/run", {
+                fetch("https://con-bot-dot.onrender.com/run", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
