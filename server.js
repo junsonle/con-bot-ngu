@@ -191,7 +191,7 @@ bot.command('run', async (ctx) => {
         else
             ping.stop();
 
-        ctx.reply("Trade " + (configs.run ? 'on' : 'off'));
+        ctx.reply("Bot " + id + " " + (configs.run ? 'on' : 'off'));
 
         console.log('Configs: ', configs);
         console.log("Trade " + (configs.run ? 'on' : 'off'));
@@ -273,7 +273,7 @@ app.post("/run", function (req, res) {
         configs.amount = Number(data.amount);
         configs.range = Number(data.range);
 
-        bot.telegram.sendMessage(chatId, "Trade " + (configs.run ? 'on' : 'off'));
+        bot.telegram.sendMessage(chatId, "Bot " + id + " " + (configs.run ? 'on' : 'off'));
 
         console.log('Configs: ', data);
         console.log("Trade " + (configs.run ? 'on' : 'off'));
@@ -477,7 +477,7 @@ async function main() {
         configs = res.rows[0];
         if (configs.run) {
 
-            bot.telegram.sendMessage(chatId, "Trade " + (configs.run ? 'on' : 'off'));
+            bot.telegram.sendMessage(chatId, "Bot " + id + " " + (configs.run ? 'on' : 'off'));
 
             console.log("Trade " + (configs.run ? 'on' : 'off'));
             tick();
