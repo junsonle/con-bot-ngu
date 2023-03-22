@@ -1,5 +1,6 @@
 const Binance = require('node-binance-api');
 const Express = require("express");
+const Monitor = require('ping-monitor');
 const {Client} = require('pg');
 const {Telegraf} = require("telegraf");
 const bodyParser = require('body-parser');
@@ -8,7 +9,6 @@ const app = Express();
 const server = require("http").Server(app);
 require('dotenv').config();
 app.set("view engine", "ejs").set("views", "./public");
-
 app.use(Express.static("./public"));
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(bodyParser.json());
@@ -16,6 +16,7 @@ app.use(bodyParser.json());
 const port = process.env.PORT;
 const id = process.env.ID;
 const url = process.env.URL;
+let chatId = process.env.TELEGRAM_ID;
 server.listen(port || 3000);
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
@@ -35,9 +36,12 @@ postgres.connect(function (err) {
     console.log("Connected Postgres Database!");
 });
 
-let binance;
-let chatId = process.env.TELEGRAM_ID;
+let ping = new Monitor({
+    website: url,
+    interval: 10 // minutes
+});
 
+let binance;
 let configs = {}
 let maxOrder = 10;
 let orderLongId;
@@ -57,7 +61,7 @@ function closeShort(price, amount) {
             quantity: `${amount}`,
             positionSide: "SHORT",
             price: `${price}`,
-            timeInForce: "GTC",
+            timeInForce: "GTX",
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
@@ -78,7 +82,7 @@ function closeLong(price, amount) {
             quantity: `${amount}`,
             positionSide: "LONG",
             price: `${price}`,
-            timeInForce: "GTC",
+            timeInForce: "GTX",
             newOrderRespType: "ACK"
         }
     ]).then((data) => {
@@ -182,6 +186,11 @@ bot.command('run', async (ctx) => {
                     where id = ${id};`, async (err, res) => {
         if (err) throw err;
 
+        if (configs.run)
+            ping.restart();
+        else
+            ping.stop();
+
         ctx.reply("Trade " + (configs.run ? 'on' : 'off'));
 
         console.log('Configs: ', configs);
@@ -274,6 +283,14 @@ app.post("/run", function (req, res) {
 });
 
 app.get('/robot.png', (req, res) => res.status(200));
+
+ping.on('up', function (res, state) {
+    console.log('Service is up');
+});
+
+ping.on('stop', function (res, state) {
+    console.log('Service is stop');
+});
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -433,6 +450,7 @@ async function main() {
     await postgres.query(`select *
                           from binance
                           where id = ${id};`, (err, res) => {
+        if (err) throw err;
         if (res.rows[0].testnet)
             binance = new Binance().options({
                 APIKEY: `${res.rows[0].key}`,
@@ -463,7 +481,8 @@ async function main() {
 
             console.log("Trade " + (configs.run ? 'on' : 'off'));
             tick();
-        }
+        } else
+            ping.stop();
     });
 }
 
