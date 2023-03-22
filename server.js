@@ -38,7 +38,7 @@ postgres.connect(function (err) {
 
 let ping = new Monitor({
     website: url,
-    interval: 10 // minutes
+    interval: 5 // minutes
 });
 
 let binance;
@@ -300,7 +300,7 @@ async function tick() {
     let price;
     while (configs.run) {
         await binance.futuresPrices().then(async prices => {
-            if (price !== prices[configs.symbol] && prices.length > 0) {
+            if (price !== prices[configs.symbol]) {
                 price = prices[configs.symbol];
 //                console.log(price);
 
