@@ -7,6 +7,7 @@ const {Telegraf} = require("telegraf");
 const app = Express();
 const server = require("http").Server(app);
 const io = require('socket.io')(server);
+require('dotenv').config();
 
 app.use(Express.static("./public"));
 const port = process.env.PORT;
@@ -35,18 +36,12 @@ let binance;
 let chatId = 1312093738;
 
 let ping = new Monitor({
-    website: 'https://con-bot-ngu-8oy7.onrender.com',
+    website: 'http://3.218.141.200:3000',
     interval: 10 // minutes
 });
 
 let configs = {
-    id: botId,
-    symbol: 'BTCBUSD',
-    run: false,
-    amount: 0.001,
-    range: 20,
-    long: true,
-    short: true,
+    id: botId
 }
 let maxOrder = 10;
 let listMess = [];
@@ -510,6 +505,7 @@ async function main() {
         await postgres.query(`select *
                               from binance
                               where id = ${configs.id};`, (err, res) => {
+            if (err) throw err;
             if (res.rows[0].testnet)
                 binance = new Binance().options({
                     APIKEY: `${res.rows[0].key}`,
