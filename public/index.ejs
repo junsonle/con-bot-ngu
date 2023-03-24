@@ -86,13 +86,12 @@
         }
     </style>
     <script>
-        const socket = io("http://3.218.141.200:3000");
+        const socket = io('<%=url%>');
 
         let configs;
 
         socket.on("configs", function (values) {
             configs = values;
-            console.log(configs);
             $("#symbol").val(configs.symbol).prop('disabled', configs.run);
             $("#amount").val(configs.amount).prop('disabled', configs.run);
             $("#range").val(configs.range).prop('disabled', configs.run);
@@ -101,20 +100,6 @@
             $("#run").val(!configs.run ? 'ON' : 'OFF');
             $("#on").prop("checked", configs.run);
         });
-
-        // function updateScroll() {
-        //     var objDiv = document.getElementById("messagesBox");
-        //     objDiv.scrollTop = objDiv.scrollHeight;
-        // }
-        //
-        // function chat(message) {
-        //     if (message.userId !== 'server') {
-        //         $("#messagesBox").append('<label id="me" class="mess">' + message.time + '<br/>' + message.value + '</label>');
-        //     } else {
-        //         $("#messagesBox").append('<label id="other" class="mess">' + new Date(message.time).toLocaleString() + '<br/>' + message.value + '</label>');
-        //     }
-        //     updateScroll();
-        // }
 
         socket.on("price", function (data) {
             $("#price").text(data);
@@ -125,20 +110,9 @@
             $("#balance").text(data);
         });
 
-        // socket.on("listMess", function (data) {
-        //     data.forEach(message => {
-        //         chat(message);
-        //     });
-        // });
-        //
-        // socket.on("serverSendMessage", function (message) {
-        //     chat(message);
-        // });
-
         $(document).ready(function () {
             $("#run").click(function () {
                 socket.emit("run", {
-                    id: configs.id,
                     run: !configs.run,
                     symbol: $("#symbol").val(),
                     amount: $("#amount").val(),
@@ -147,33 +121,6 @@
                     short: $("#sideS").is(':checked'),
                 });
             });
-
-            // $("#chat").click(function () {
-            //     if ($("#message").val() !== "") {
-            //         chat({value: $("#message").val(), userId: socket.id, time: new Date().toLocaleString()});
-            //         socket.emit("clientSendMessage", {
-            //             value: $("#message").val(),
-            //             userId: socket.id,
-            //             time: new Date().toLocaleString()
-            //         });
-            //         $("#message").val("");
-            //     }
-            // });
-            //
-            // $("#clear").click(function () {
-            //     chat({value: 'clear', userId: socket.id, time: new Date().toLocaleString()});
-            //     socket.emit("clientSendMessage", {
-            //         value: 'clear',
-            //         userId: socket.id,
-            //         time: new Date().toLocaleString()
-            //     });
-            // });
-            //
-            // $("#message").on('keypress', function (e) {
-            //     if (e.which === 13) {
-            //         $("#chat").click();
-            //     }
-            // });
         });
 
     </script>
@@ -201,24 +148,16 @@
                 <tr>
                     <td><label>Side</label></td>
                     <td>
-                        <label style="background: rgb(14, 203, 129); color: white"><input id="sideL" type="checkbox"
-                                                                                          name="sideL"/> Long </label>
-                        <label style="background: rgb(246, 70, 93); color: white"><input id="sideS" type="checkbox"
-                                                                                         name="sideS"/> Short </label>
+                        <label style="background: rgb(14, 203, 129); color: white"><input id="sideL" type="checkbox" name="sideL"/> Long </label>
+                        <label style="background: rgb(246, 70, 93); color: white"><input id="sideS" type="checkbox" name="sideS"/> Short </label>
                     </td>
                 </tr>
             </table>
             <br/>
-            <!--        <label>ON/OFF: </label>-->
             <input id="run" type="button" value="ON" name="run"/>
             <input id="clear" type="button" value="CLEAR" name="clear"/>
         </form>
     </div>
 </center>
-<!--<div class="container">-->
-<!--    <input id="message" type="text" name="mess" placeholder="message"/>-->
-<!--    <input id="chat" type="button" value="send" name="chat"/><br>-->
-<!--    <label id="messagesBox"></label>-->
-<!--</div>-->
 </body>
 </html>

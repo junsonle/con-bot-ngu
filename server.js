@@ -8,15 +8,16 @@ const app = Express();
 const server = require("http").Server(app);
 const io = require('socket.io')(server);
 require('dotenv').config();
-
 app.use(Express.static("./public"));
+app.set("view engine", "ejs").set("views", "./public");
+
 const port = process.env.PORT;
-const botId = process.env.ID;
+const id = process.env.ID;
+const url = process.env.URL;
+let chatId = process.env.TELEGRAM_ID;
 server.listen(port || 3000);
 
-const YOUR_TOKEN = "6215665987:AAEd_mSldUN39BvsNhmksVNORAromu5RZNY";
-const bot = new Telegraf(YOUR_TOKEN);
-
+const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const postgres = new Client({
     user: 'bot',
     host: 'dpg-cfgvcb9a6gdvgkl9i1hg-a.frankfurt-postgres.render.com',
@@ -31,20 +32,14 @@ postgres.connect(function (err) {
     if (err) throw err;
     console.log("Connected Postgres Database!");
 });
-
-let binance;
-let chatId = 1312093738;
-
 let ping = new Monitor({
-    website: 'http://3.218.141.200:3000',
+    website: url,
     interval: 10 // minutes
 });
 
-let configs = {
-    id: botId
-}
+let binance;
+let configs = {}
 let maxOrder = 10;
-let listMess = [];
 let orderLongId;
 let orderShortId;
 let orderLongMId;
@@ -176,75 +171,9 @@ function openLongM(price, amount) {
     }).catch(e => console.log(e.code));
 }
 
-function serverSendMessage(message) {
-    let mess = {
-        value: message,
-        time: new Date(),
-        userId: 'server'
-    };
-    io.emit("serverSendMessage", mess);
-    listMess.push(mess);
-}
-
-function serverSendBalance() {
-    binance.futuresBalance().then(values => {
-        if (values.length > 0) {
-            let mess = '';
-            for (let value of values.filter(f => f.balance != 0)) {
-                mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl}<br/>`;
-            }
-            serverSendMessage(mess);
-        }
-    }).catch(e => console.log(e.code));
-}
-
 io.on('connect', function (socket) {
 
-    //console.log(socket.id + " Da ket noi!");
     io.to(socket.id).emit("configs", configs);
-    io.to(socket.id).emit("listMess", listMess);
-
-    socket.on('clientSendMessage', function (data) {
-        listMess.push(data);
-        //console.log(socket.id + ": " + data);
-        socket.broadcast.emit("serverSendMessage", data);
-
-        if (data.value === 'clear') {
-            //if (configs.run)
-            //    serverSendMessage('Server is runing!');
-            //else
-            // dong tat ca cac lenh
-            binance.futuresCancelAll(configs.symbol).then(value => {
-                if (value.code === 200) {
-                    //listMess = [];
-                    orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
-                    serverSendMessage('Done!');
-                } else
-                    serverSendMessage('Error!');
-            }).catch(e => console.log(e.code));
-        } else if (data.value === 'order') {
-            binance.futuresOpenOrders(configs.symbol).then(values => {
-                if (values.length > 0)
-                    values.forEach(data => {
-                        serverSendMessage(
-                            `${configs.symbol}: 
-                            ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | 
-                            ${data.positionSide} | 
-                            ${data.price}`
-                        );
-                    });
-            }).catch(e => console.log(e.code));
-        } else if (data.value === 'balance') {
-            serverSendBalance();
-        } else if (data.value === 'position') {
-            binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
-                if (position.length > 0)
-                position.forEach(data => {
-                    serverSendMessage(`${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
-                });
-            }).catch(e => console.log(e.code));
-        }
-    });
 
     socket.on('run', function (data) {
         postgres.query(`update config
@@ -253,9 +182,9 @@ io.on('connect', function (socket) {
                             range=${data.range},
                             long=${data.long},
                             short=${data.short}
-                        where id = ${configs.id};`, async (err, res) => {
+                        where id = ${id};`, async (err, res) => {
             if (err) throw err;
-            configs = data;
+            configs = {id: id, ...data};
             configs.amount = Number(data.amount);
             configs.range = Number(data.range);
 
@@ -264,19 +193,13 @@ io.on('connect', function (socket) {
             else
                 ping.stop();
 
-            bot.telegram.sendMessage(chatId, "Trade " + (configs.run ? 'on' : 'off'));
+            bot.telegram.sendMessage(chatId, "Bot " + id + " " + (configs.run ? 'on' : 'off'));
 
             console.log('Configs: ', data);
             console.log("Trade " + (configs.run ? 'on' : 'off'));
             socket.emit("configs", data);
-            serverSendMessage("Trade " + (configs.run ? 'on' : 'off'));
-            serverSendBalance();
             await tick();
         });
-    });
-
-    socket.on('disconnect', function () {
-        console.log(socket.id + " Da ngat ket noi!");
     });
 
 });
@@ -284,6 +207,33 @@ io.on('connect', function (socket) {
 bot.start((ctx) => {
     chatId = ctx.message.chat.id;
     ctx.reply("Welcome to bot");
+});
+bot.command('run', async (ctx) => {
+    configs.run = !configs.run;
+    postgres.query(`update config
+                    set run=${configs.run}
+                    where id = ${id};`, async (err, res) => {
+        if (err) throw err;
+
+        if (configs.run)
+            ping.restart();
+        else
+            ping.stop();
+
+        ctx.reply("Bot " + id + " " + (configs.run ? 'on' : 'off'));
+
+        console.log('Configs: ', configs);
+        console.log("Trade " + (configs.run ? 'on' : 'off'));
+        await tick();
+    });
+});
+bot.command("web", async (ctx) => {
+    ctx.reply(url);
+});
+bot.command("price", async (ctx) => {
+    binance.futuresPrices().then(prices => {
+        ctx.reply(prices[configs.symbol]);
+    }).catch(e => console.log(e.code));
 });
 bot.command("clear", async (ctx) => {
     binance.futuresCancelAll(configs.symbol).then(value => {
@@ -325,7 +275,7 @@ bot.command("position", async (ctx) => {
 });
 
 app.get("/", function (req, res) {
-    res.render("index");
+    res.render("index", {url: url});
 });
 
 app.get('/robot.png', (req, res) => res.status(200));
@@ -426,9 +376,9 @@ async function tick() {
                                         //closeShort(Math.round(order.price) + configs.range, Math.max((order.origQty - configs.amount).toFixed(3), configs.amount));
                                     } else if (order.status === 'FILLED') {
                                         //closeShort(Math.round(price) - configs.range, Math.min(configs.amount, position[0].positionAmt));
-                                        closeShort(Math.round(price) - configs.range, Math.min(configs.amount, - position[1].positionAmt));
+                                        closeShort(Math.round(price) - configs.range, Math.min(configs.amount, -position[1].positionAmt));
                                     } else {
-                                        closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, - position[1].positionAmt);
+                                        closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, -position[1].positionAmt);
                                     }
                                 }).catch(e => console.log(e.code));
                             }
@@ -504,7 +454,7 @@ async function main() {
     try {
         await postgres.query(`select *
                               from binance
-                              where id = ${configs.id};`, (err, res) => {
+                              where id = ${id};`, (err, res) => {
             if (err) throw err;
             if (res.rows[0].testnet)
                 binance = new Binance().options({
@@ -527,23 +477,19 @@ async function main() {
 
         await postgres.query(`select *
                               from config
-                              where id = ${configs.id};`, (err, res) => {
+                              where id = ${id};`, (err, res) => {
             if (err) throw err;
             configs = res.rows[0];
             if (configs.run) {
-
-                bot.telegram.sendMessage(chatId, "Trade " + (configs.run ? 'on' : 'off'));
-
                 console.log("Trade " + (configs.run ? 'on' : 'off'));
-                serverSendMessage("Trade " + (configs.run ? 'on' : 'off'));
-                serverSendBalance();
                 tick();
             } else
                 ping.stop();
+
+            bot.telegram.sendMessage(chatId, "Bot " + id + " " + (configs.run ? 'on' : 'off'));
         });
     } catch (e) {
         console.log(e.code);
-        serverSendMessage(e.code);
     }
 }
 
