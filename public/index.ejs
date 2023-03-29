@@ -53,37 +53,6 @@
             padding: 5px;
             border-radius: 3px;
         }
-
-        .mess {
-            color: white;
-            width: 90%;
-            border-radius: 8px;
-            margin: 2px;
-            background: rgb(43, 49, 58);
-        }
-
-        #me {
-            float: right;
-            border-bottom-right-radius: 0px;
-            text-align: right;
-        }
-
-        #other {
-            float: left;
-            border-bottom-left-radius: 0px;
-            text-align: left;
-        }
-
-        #messagesBox {
-            width: 400px;
-            height: 600px;
-            /*margin-top: 10px;*/
-            overflow-y: scroll;
-        }
-
-        ::-webkit-scrollbar {
-            display: none;
-        }
     </style>
     <script>
         const socket = io('<%=url%>');
@@ -155,7 +124,7 @@
             </table>
             <br/>
             <input id="run" type="button" value="ON" name="run"/>
-            <input id="clear" type="button" value="CLEAR" name="clear"/>
+<!--            <input id="clear" type="button" value="CLEAR" name="clear"/>-->
         </form>
     </div>
 </center>
