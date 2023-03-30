@@ -168,6 +168,9 @@ io.on('connect', function (socket) {
 
     socket.on('run', function (data) {
         configs = data;
+        configs.amount = Number(data.amount);
+        configs.range = Number(data.range);
+
         fs.writeFile(configPath, JSON.stringify(configs), async err => {
             if (err) throw err;
 
