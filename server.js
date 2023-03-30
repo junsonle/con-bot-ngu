@@ -1,8 +1,7 @@
 const Binance = require('node-binance-api');
 const Express = require("express");
-const Monitor = require('ping-monitor');
-const {Client} = require('pg');
 const {Telegraf} = require("telegraf");
+const  fs = require('fs');
 
 const app = Express();
 const server = require("http").Server(app);
@@ -12,32 +11,24 @@ app.use(Express.static("./public"));
 app.set("view engine", "ejs").set("views", "./public");
 
 const port = process.env.PORT;
-const id = process.env.ID;
 const url = process.env.URL;
-let chatId = process.env.TELEGRAM_ID;
+const chatId = process.env.TELEGRAM_ID;
 server.listen(port || 3000);
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
-const postgres = new Client({
-    user: 'bot',
-    host: 'dpg-cfgvcb9a6gdvgkl9i1hg-a.frankfurt-postgres.render.com',
-    database: 'bot_k3zu',
-    password: 'XSX2LR61vQri7WUEQybgCzdTG1E3es6x',
-    port: 5432,
-    ssl: {
-        rejectUnauthorized: false
+const configPath = './config.json';
+const binance = new Binance().options({
+    APIKEY: process.env.APIKEY,
+    APISECRET: process.env.APISECRET,
+    // useServerTime: true,
+    test: true,
+    urls: {
+        base: 'https://testnet.binance.vision/api/',
+        combineStream: 'wss://testnet.binance.vision/stream?streams=',
+        stream: 'wss://testnet.binance.vision/ws/'
     }
 });
-postgres.connect(function (err) {
-    if (err) throw err;
-    console.log("Connected Postgres Database!");
-});
-let ping = new Monitor({
-    website: url,
-    interval: 10 // minutes
-});
 
-let binance;
 let configs = {}
 let maxOrder = 10;
 let orderLongId;
@@ -176,55 +167,39 @@ io.on('connect', function (socket) {
     io.to(socket.id).emit("configs", configs);
 
     socket.on('run', function (data) {
-        postgres.query(`update config
-                        set run=${data.run},
-                            amount=${data.amount},
-                            range=${data.range},
-                            long=${data.long},
-                            short=${data.short}
-                        where id = ${id};`, async (err, res) => {
+        configs = data;
+        fs.writeFile(configPath, JSON.stringify(configs), async err => {
             if (err) throw err;
-            configs = {id: id, ...data};
-            configs.amount = Number(data.amount);
-            configs.range = Number(data.range);
 
-            if (configs.run)
-                ping.restart();
-            else
-                ping.stop();
+            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
 
-            bot.telegram.sendMessage(chatId, "Bot " + id + " " + (configs.run ? 'on' : 'off'));
-
-            console.log('Configs: ', data);
+            console.log('Configs: ', configs);
             console.log("Trade " + (configs.run ? 'on' : 'off'));
-            socket.emit("configs", data);
-            await tick();
+            socket.emit("configs", configs);
+            if (configs.run) {
+                await tick();
+            }
         });
     });
 
 });
 
 bot.start((ctx) => {
-    chatId = ctx.message.chat.id;
     ctx.reply("Welcome to bot");
 });
 bot.command('run', async (ctx) => {
     configs.run = !configs.run;
-    postgres.query(`update config
-                    set run=${configs.run}
-                    where id = ${id};`, async (err, res) => {
+    fs.writeFile(configPath, JSON.stringify(configs), async err => {
         if (err) throw err;
 
-        if (configs.run)
-            ping.restart();
-        else
-            ping.stop();
-
-        ctx.reply("Bot " + id + " " + (configs.run ? 'on' : 'off'));
+        ctx.reply(chatId, "Bot " + (configs.run ? 'on' : 'off'));
 
         console.log('Configs: ', configs);
         console.log("Trade " + (configs.run ? 'on' : 'off'));
-        await tick();
+        socket.emit("configs", configs);
+        if (configs.run) {
+            await tick();
+        }
     });
 });
 bot.command("web", async (ctx) => {
@@ -279,14 +254,6 @@ app.get("/", function (req, res) {
 });
 
 app.get('/robot.png', (req, res) => res.status(200));
-
-ping.on('up', function (res, state) {
-    console.log('Service is up');
-});
-
-ping.on('stop', function (res, state) {
-    console.log('Service is stop');
-});
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -391,7 +358,7 @@ async function tick() {
                                         if (order.status !== 'NEW')
                                             openShort(Math.max(Math.round(position[1].entryPrice) + configs.range * count, Math.round(price) + configs.range), configs.amount);
                                     } else if (order.status === 'NEW') {
-                                        if (order.price - configs.range * 2 > price && price > topShort - 5) {
+                                        if (order.price - configs.range * 2 > price && (price > topShort - 5 || position[1].entryPrice == 0)) {
                                             openShort(Math.round(price) + configs.range, order.origQty);
                                         }
                                     } else {
@@ -420,7 +387,7 @@ async function tick() {
                         }
                     }
                 }).catch(e => console.log(e.code));
-            } else if (orderLongId !== -1 && orderShortId !== -1 && orderLongMId !== -1 && orderShortMId !== -1 && closeLongId !== -1 && closeShortId !== -1)
+            } else //if (orderLongId !== -1 && orderShortId !== -1 && orderLongMId !== -1 && orderShortMId !== -1 && closeLongId !== -1 && closeShortId !== -1)
                 await binance.futuresOpenOrders(configs.symbol).then(orders => {
                     if (orders.length > 0) {
                         orders.forEach(order => {
@@ -452,47 +419,22 @@ async function tick() {
 
 async function main() {
     try {
-        await postgres.query(`select *
-                              from binance
-                              where id = ${id};`, (err, res) => {
+        await fs.readFile(configPath, 'utf8', (err, data) => {
             if (err) throw err;
-            if (res.rows[0].testnet)
-                binance = new Binance().options({
-                    APIKEY: `${res.rows[0].key}`,
-                    APISECRET: `${res.rows[0].secret}`,
-                    // useServerTime: true,
-                    test: true,
-                    urls: {
-                        base: 'https://testnet.binance.vision/api/',
-                        combineStream: 'wss://testnet.binance.vision/stream?streams=',
-                        stream: 'wss://testnet.binance.vision/ws/'
-                    }
-                });
-            else
-                binance = new Binance().options({
-                    APIKEY: `${res.rows[0].key}`,
-                    APISECRET: `${res.rows[0].secret}`
-                });
-        });
+            configs = JSON.parse(data);
 
-        await postgres.query(`select *
-                              from config
-                              where id = ${id};`, (err, res) => {
-            if (err) throw err;
-            configs = res.rows[0];
             if (configs.run) {
-                console.log("Trade " + (configs.run ? 'on' : 'off'));
                 tick();
-            } else
-                ping.stop();
-
-            bot.telegram.sendMessage(chatId, "Bot " + id + " " + (configs.run ? 'on' : 'off'));
+            }
+            console.log('Configs: ', configs);
+            console.log("Trade " + (configs.run ? 'on' : 'off'));
+            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
         });
     } catch (e) {
         console.log(e.code);
     }
 }
 
-bot.launch();
+bot.launch().then(r => {}).catch(e => console.log(e.code));
 
-main();
+main().then(r => {}).catch(e => console.log(e.code));
