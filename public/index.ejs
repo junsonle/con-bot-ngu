@@ -3,6 +3,7 @@
     <title>Bot</title>
     <link rel="icon" href="/bot.png">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <script src="socket.io/socket.io.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <style>
         .container {
@@ -52,44 +53,14 @@
             padding: 5px;
             border-radius: 3px;
         }
-
-        .mess {
-            color: white;
-            width: 90%;
-            border-radius: 8px;
-            margin: 2px;
-            background: rgb(43, 49, 58);
-        }
-
-        #me {
-            float: right;
-            border-bottom-right-radius: 0px;
-            text-align: right;
-        }
-
-        #other {
-            float: left;
-            border-bottom-left-radius: 0px;
-            text-align: left;
-        }
-
-        #messagesBox {
-            width: 400px;
-            height: 600px;
-            /*margin-top: 10px;*/
-            overflow-y: scroll;
-        }
-
-        ::-webkit-scrollbar {
-            display: none;
-        }
     </style>
     <script>
+        const socket = io('<%=url%>');
 
-        const url = '<%=url%>';
         let configs;
 
-        function setForm (configs) {
+        socket.on("configs", function (values) {
+            configs = values;
             $("#symbol").val(configs.symbol).prop('disabled', configs.run);
             $("#amount").val(configs.amount).prop('disabled', configs.run);
             $("#range").val(configs.range).prop('disabled', configs.run);
@@ -97,36 +68,26 @@
             $("#sideS").prop('checked', configs.short);
             $("#run").val(!configs.run ? 'ON' : 'OFF');
             $("#on").prop("checked", configs.run);
-        }
+        });
 
-        fetch(url + "/configs", {method : "GET"})
-            .then(async (response) => {
-                configs = await response.json();
-                setForm(configs);
-            }).catch((error) => {
-                console.error("Error:", error);
-            });
+        socket.on("price", function (data) {
+            $("#price").text(data);
+        });
+
+        socket.on("balance", function (data) {
+            document.title = data;
+            $("#balance").text(data);
+        });
 
         $(document).ready(function () {
             $("#run").click(function () {
-                configs = {
+                socket.emit("run", {
                     run: !configs.run,
                     symbol: $("#symbol").val(),
                     amount: $("#amount").val(),
                     range: $("#range").val(),
                     long: $("#sideL").is(':checked'),
                     short: $("#sideS").is(':checked'),
-                };
-                fetch(url + "/run", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(configs)
-                }).then(async (response) => {
-                    setForm(configs);
-                }).catch((error) => {
-                    console.error("Error:", error);
                 });
             });
         });
@@ -137,7 +98,6 @@
 <center>
     <div class="container">
         <input id="on" type="radio" style="float: left; width: 15px; height: 15px"/>
-<!--        <input id="reload" type="button" style="float: right; width: 20px; height: 20px"/>-->
         <h4 id="price" style="margin: 10px">Messenger</h4>
         <label id="balance">BUSD</label>
         <form id="form">
@@ -164,7 +124,7 @@
             </table>
             <br/>
             <input id="run" type="button" value="ON" name="run"/>
-            <input id="clear" type="button" value="CLEAR" name="clear"/>
+<!--            <input id="clear" type="button" value="CLEAR" name="clear"/>-->
         </form>
     </div>
 </center>
