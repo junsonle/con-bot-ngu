@@ -429,6 +429,7 @@ async function main() {
             if (configs.run) {
                 tick();
             }
+
             console.log('Configs: ', configs);
             console.log("Trade " + (configs.run ? 'on' : 'off'));
             bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
