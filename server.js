@@ -15,7 +15,7 @@ const url = process.env.URL;
 const chatId = process.env.TELEGRAM_ID;
 server.listen(port || 3000);
 
-// const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
+const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const configPath = './config.json';
 const binance = new Binance().options({
     APIKEY: process.env.APIKEY,
@@ -174,7 +174,7 @@ io.on('connect', function (socket) {
         fs.writeFile(configPath, JSON.stringify(configs), async err => {
             if (err) throw err;
 
-            // bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
+            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
 
             console.log('Configs: ', configs);
             console.log("Trade " + (configs.run ? 'on' : 'off'));
@@ -187,70 +187,70 @@ io.on('connect', function (socket) {
 
 });
 
-// bot.start((ctx) => {
-//     ctx.reply("Welcome to bot");
-// });
-// bot.command('run', async (ctx) => {
-//     configs.run = !configs.run;
-//     fs.writeFile(configPath, JSON.stringify(configs), async err => {
-//         if (err) throw err;
-//
-//         ctx.reply(chatId, "Bot " + (configs.run ? 'on' : 'off'));
-//
-//         console.log('Configs: ', configs);
-//         console.log("Trade " + (configs.run ? 'on' : 'off'));
-//         socket.emit("configs", configs);
-//         if (configs.run) {
-//             await tick();
-//         }
-//     });
-// });
-// bot.command("web", async (ctx) => {
-//     ctx.reply(url);
-// });
-// bot.command("price", async (ctx) => {
-//     binance.futuresPrices().then(prices => {
-//         ctx.reply(prices[configs.symbol]);
-//     }).catch(e => console.log(e.code));
-// });
-// bot.command("clear", async (ctx) => {
-//     binance.futuresCancelAll(configs.symbol).then(value => {
-//         if (value.code === 200) {
-//             orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
-//             ctx.reply('Done!');
-//         } else
-//             ctx.reply('Error!');
-//     }).catch(e => console.log(e.code));
-// });
-// bot.command("order", async (ctx) => {
-//     binance.futuresOpenOrders(configs.symbol).then(values => {
-//         if (values.length > 0)
-//             values.forEach(data => {
-//                 ctx.reply(
-//                     `${configs.symbol}: ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | ${data.positionSide} | ${data.price}`
-//                 );
-//             });
-//     }).catch(e => console.log(e.code));
-// });
-// bot.command("balance", async (ctx) => {
-//     binance.futuresBalance().then(values => {
-//         if (values.length > 0) {
-//             let mess = '';
-//             for (let value of values.filter(f => f.balance != 0)) {
-//                 mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl} \n`;
-//             }
-//             ctx.reply(mess);
-//         }
-//     }).catch(e => console.log(e.code));
-// });
-// bot.command("position", async (ctx) => {
-//     binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
-//         if (position.length > 0)
-//             position.forEach(data => {
-//                 ctx.reply(`${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
-//             });
-//     }).catch(e => console.log(e.code));
-// });
+bot.start((ctx) => {
+    ctx.reply("Welcome to bot");
+});
+bot.command('run', async (ctx) => {
+    configs.run = !configs.run;
+    fs.writeFile(configPath, JSON.stringify(configs), async err => {
+        if (err) throw err;
+
+        ctx.reply(chatId, "Bot " + (configs.run ? 'on' : 'off'));
+
+        console.log('Configs: ', configs);
+        console.log("Trade " + (configs.run ? 'on' : 'off'));
+        socket.emit("configs", configs);
+        if (configs.run) {
+            await tick();
+        }
+    });
+});
+bot.command("web", async (ctx) => {
+    ctx.reply(url);
+});
+bot.command("price", async (ctx) => {
+    binance.futuresPrices().then(prices => {
+        ctx.reply(prices[configs.symbol]);
+    }).catch(e => console.log(e.code));
+});
+bot.command("clear", async (ctx) => {
+    binance.futuresCancelAll(configs.symbol).then(value => {
+        if (value.code === 200) {
+            orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
+            ctx.reply('Done!');
+        } else
+            ctx.reply('Error!');
+    }).catch(e => console.log(e.code));
+});
+bot.command("order", async (ctx) => {
+    binance.futuresOpenOrders(configs.symbol).then(values => {
+        if (values.length > 0)
+            values.forEach(data => {
+                ctx.reply(
+                    `${configs.symbol}: ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | ${data.positionSide} | ${data.price}`
+                );
+            });
+    }).catch(e => console.log(e.code));
+});
+bot.command("balance", async (ctx) => {
+    binance.futuresBalance().then(values => {
+        if (values.length > 0) {
+            let mess = '';
+            for (let value of values.filter(f => f.balance != 0)) {
+                mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl} \n`;
+            }
+            ctx.reply(mess);
+        }
+    }).catch(e => console.log(e.code));
+});
+bot.command("position", async (ctx) => {
+    binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
+        if (position.length > 0)
+            position.forEach(data => {
+                ctx.reply(`${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
+            });
+    }).catch(e => console.log(e.code));
+});
 
 app.get("/", function (req, res) {
     res.render("index", {url: url});
@@ -265,12 +265,11 @@ function delay(ms) {
 async function tick() {
     let price;
     while (configs.run) {
-        await binance.futuresPrices().then(async prices => {
+        await binance.futuresPrices().then(prices => {
             if (price !== prices[configs.symbol]) {
                 price = prices[configs.symbol];
-//                console.log(price);
                 io.emit("price", `${configs.symbol}: ${price}`);
-                await binance.futuresBalance().then(values => {
+                binance.futuresBalance().then(values => {
                     if (values.length > 0) {
                         values.filter(o => o.asset === 'BUSD').forEach(value => {
                             io.emit("balance", `${Number(value.balance).toFixed(2)} ${value.crossUnPnl > 0 ? '+' : ''}${Number(value.crossUnPnl).toFixed(2)} | BUSD`);
@@ -278,7 +277,7 @@ async function tick() {
                     }
                 }).catch(e => console.log(e.code));
 
-                await binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
+                binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
                     if (position) {
                         //let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
                         if (configs.long) {
@@ -390,8 +389,8 @@ async function tick() {
                         }
                     }
                 }).catch(e => console.log(e.code));
-            } else //if (orderLongId !== -1 && orderShortId !== -1 && orderLongMId !== -1 && orderShortMId !== -1 && closeLongId !== -1 && closeShortId !== -1)
-                await binance.futuresOpenOrders(configs.symbol).then(orders => {
+            } else
+                binance.futuresOpenOrders(configs.symbol).then(orders => {
                     if (orders.length > 0) {
                         orders.forEach(order => {
                             switch (order.orderId) {
@@ -422,7 +421,7 @@ async function tick() {
 
 async function main() {
     try {
-        await fs.readFile(configPath, 'utf8', (err, data) => {
+        fs.readFile(configPath, 'utf8', (err, data) => {
             if (err) throw err;
             configs = JSON.parse(data);
 
@@ -432,13 +431,13 @@ async function main() {
 
             console.log('Configs: ', configs);
             console.log("Trade " + (configs.run ? 'on' : 'off'));
-            // bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
+            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
         });
     } catch (e) {
         console.log(e.code);
     }
 }
 
-// bot.launch().then(r => {}).catch(e => console.log(e.code));
+bot.launch().then(r => {}).catch(e => console.log(e.code));
 
 main().then(r => {}).catch(e => console.log(e.code));
