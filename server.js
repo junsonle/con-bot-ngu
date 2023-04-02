@@ -264,7 +264,7 @@ function delay(ms) {
 async function tick() {
     let price;
     while (configs.run) {
-        await binance.futuresPrices().then(prices => {
+        await binance.futuresPrices().then(async prices => {
             if (price !== prices[configs.symbol]) {
                 price = prices[configs.symbol];
                 io.emit("price", `${configs.symbol}: ${price}`);
@@ -276,19 +276,21 @@ async function tick() {
                     }
                 }).catch(e => console.log(e.code));
 
-                binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
+                await binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
                     if (position) {
                         if (configs.long) {
                             // open long limit
                             if (orderLongId !== -1) {
+                                let count = position[0].positionAmt / configs.amount;
+                                let botLong = Number(position[0].entryPrice) - configs.range * (count - 1) / 2;
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongId}`}).then(order => {
                                     if (order.status === 'NEW') {
-                                        if (price - configs.range * 2 > order.price) {
+                                        if (price - configs.range * 2 > order.price && price < botLong) {
                                             openLong(Math.round(price) - configs.range, order.origQty);
                                             binance.futuresCancel(configs.symbol, {orderId: `${order.orderId}`});
                                         }
                                     } else {
-                                        openLong(Math.round(price) - configs.range, configs.amount);
+                                        openLong(Math.round(position[0].entryPrice > 0 && botLong < price ? botLong : price) - configs.range, configs.amount);
                                     }
                                     if (order.status === 'FILLED')
                                         closeLong(Math.round(order.avgPrice) + configs.range, order.executedQty);
@@ -298,12 +300,12 @@ async function tick() {
                             if (orderLongMId !== -1) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongMId}`}).then(order => {
                                     if (order.status === 'NEW') {
-                                        if (order.stopPrice - configs.range * 2 > price) {
+                                        if (order.stopPrice - configs.range * 2 > price && price > position[0].entryPrice) {
                                             openLongM(Math.round(price) + configs.range, order.origQty);
                                             binance.futuresCancel(configs.symbol, {orderId: `${order.orderId}`});
                                         }
                                     } else {
-                                        openLongM(Math.round(price) + configs.range, configs.amount);
+                                        openLongM(Math.round(position[0].entryPrice > price ? position[0].entryPrice : price) + configs.range, configs.amount);
                                     }
                                     if (order.status === 'FILLED')
                                         closeLong(Math.round(order.avgPrice) + configs.range, order.executedQty);
@@ -316,14 +318,16 @@ async function tick() {
                         if (configs.short) {
                             // open short limit
                             if (orderShortId !== -1) {
+                                let count = position[1].positionAmt / -configs.amount;
+                                let topShort = Number(position[1].entryPrice) + configs.range * (count - 1) / 2;
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortId}`}).then(order => {
                                     if (order.status === 'NEW') {
-                                        if (order.price - configs.range * 2 > price) {
+                                        if (order.price - configs.range * 2 > price && price > topShort) {
                                             openShort(Math.round(price) + configs.range, order.origQty);
                                             binance.futuresCancel(configs.symbol, {orderId: `${order.orderId}`});
                                         }
                                     } else {
-                                        openShort(Math.round(price) + configs.range, configs.amount);
+                                        openShort(Math.round(topShort > price ? topShort : price) + configs.range, configs.amount);
                                     }
                                     if (order.status === 'FILLED')
                                         closeShort(Math.round(order.avgPrice) - configs.range, order.executedQty);
@@ -333,12 +337,12 @@ async function tick() {
                             if (orderShortMId !== -1) {
                                 binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortMId}`}).then(order => {
                                     if (order.status === 'NEW') {
-                                        if (price - configs.range * 2 > order.stopPrice) {
+                                        if (price - configs.range * 2 > order.stopPrice && price < position[1].entryPrice) {
                                             openShortM(Math.round(price) - configs.range, order.origQty);
                                             binance.futuresCancel(configs.symbol, {orderId: `${order.orderId}`});
                                         }
-                                    }  else {
-                                        openShortM(Math.round(price) - configs.range, configs.amount);
+                                    } else {
+                                        openShortM(Math.round(position[1].entryPrice > 0 && position[1].entryPrice < price ? position[1].entryPrice : price) - configs.range, configs.amount);
                                     }
                                     if (order.status === 'FILLED')
                                         closeShort(Math.round(order.avgPrice) - configs.range, order.executedQty);
