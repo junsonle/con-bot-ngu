@@ -181,9 +181,11 @@ io.on('connect', function (socket) {
             bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
 
             if (configs.run)
-                ping.restart();
-            else
+                ping.start();
+            else {
+                bot.stop();
                 ping.stop();
+            }
 
             console.log('Configs: ', configs);
             console.log("Trade " + (configs.run ? 'on' : 'off'));
@@ -207,9 +209,11 @@ bot.command('run', async (ctx) => {
         ctx.reply(chatId, "Bot " + (configs.run ? 'on' : 'off'));
 
         if (configs.run)
-            ping.restart();
-        else
+            ping.start();
+        else {
+            bot.stop();
             ping.stop();
+        }
 
         console.log('Configs: ', configs);
         console.log("Trade " + (configs.run ? 'on' : 'off'));
@@ -379,7 +383,7 @@ async function main() {
             configs = JSON.parse(data);
 
             if (configs.run) {
-                ping.restart();
+                ping.start();
                 tick();
             } else
                 ping.stop();
