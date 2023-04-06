@@ -178,11 +178,12 @@ io.on('connect', function (socket) {
         fs.writeFile(configPath, JSON.stringify(configs), async err => {
             if (err) throw err;
 
-            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
+            await bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
 
-            if (configs.run)
+            if (configs.run) {
                 ping.start();
-            else {
+                bot.start();
+            } else {
                 bot.stop();
                 ping.stop();
             }
@@ -208,9 +209,10 @@ bot.command('run', async (ctx) => {
 
         ctx.reply(chatId, "Bot " + (configs.run ? 'on' : 'off'));
 
-        if (configs.run)
+        if (configs.run) {
             ping.start();
-        else {
+            bot.start();
+        } else {
             bot.stop();
             ping.stop();
         }
