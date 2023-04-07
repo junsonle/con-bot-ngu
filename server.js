@@ -283,6 +283,14 @@ app.get("/", function (req, res) {
 
 app.get('/robot.png', (req, res) => res.status(200));
 
+ping.on('up', function (res, state) {
+    console.log('Service is up');
+});
+
+ping.on('stop', function (res, state) {
+    console.log('Service is stop');
+});
+
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
