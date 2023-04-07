@@ -179,7 +179,7 @@ io.on('connect', function (socket) {
             if (err) throw err;
 
             if (configs.run)
-                ping.start();
+                ping.restart();
             else
                 ping.stop();
 
@@ -218,7 +218,7 @@ bot.command('run', async (ctx) => {
         if (err) throw err;
 
         if (configs.run)
-            ping.start();
+            ping.restart();
         else
             ping.stop();
 
@@ -397,10 +397,9 @@ async function main() {
             if (err) throw err;
             configs = JSON.parse(data);
 
-            if (configs.run) {
-                ping.start();
+            if (configs.run)
                 tick();
-            } else
+            else
                 ping.stop();
 
             console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
