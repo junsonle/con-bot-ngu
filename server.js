@@ -184,7 +184,7 @@ io.on('connect', function (socket) {
                 ping.stop();
 
             console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
-            await bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
+            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
             socket.emit("configs", configs);
             if (configs.run) {
                 await tick();
@@ -194,18 +194,18 @@ io.on('connect', function (socket) {
 
     socket.on('clear', function (data) {
         bot.telegram.sendMessage(chatId, '/clear');
-        binance.futuresCancelAll(configs.symbol).then(async value => {
+        binance.futuresCancelAll(configs.symbol).then(value => {
             if (value.code === 200) {
                 orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
-                await bot.telegram.sendMessage(chatId, 'Done!');
+                bot.telegram.sendMessage(chatId, 'Done!');
             } else
-                await bot.telegram.sendMessage(chatId, 'Error!');
+                bot.telegram.sendMessage(chatId, 'Error!');
         }).catch(e => console.log(e.code));
     });
 
     socket.on('bot', function (data) {
-        bot.launch().then(async r => {
-            await bot.telegram.sendMessage(chatId, 'Bot telegram start');
+        bot.launch().then(r => {
+            bot.telegram.sendMessage(chatId, 'Bot telegram start');
         }).catch(e => console.log(e));
     });
 
