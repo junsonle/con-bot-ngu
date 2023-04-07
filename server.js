@@ -14,7 +14,7 @@ app.set("view engine", "ejs").set("views", "./public");
 const port = process.env.PORT;
 const url = process.env.URL;
 const chatId = process.env.TELEGRAM_ID;
-server.listen(port || 3001);
+server.listen(port || 3000);
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const configPath = './config.json';
@@ -178,23 +178,35 @@ io.on('connect', function (socket) {
         fs.writeFile(configPath, JSON.stringify(configs), async err => {
             if (err) throw err;
 
-            await bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
-
-            if (configs.run) {
+            if (configs.run)
                 ping.start();
-                bot.start();
-            } else {
-                bot.stop();
+            else
                 ping.stop();
-            }
 
-            console.log('Configs: ', configs);
-            console.log("Trade " + (configs.run ? 'on' : 'off'));
+            console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
+            await bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
             socket.emit("configs", configs);
             if (configs.run) {
                 await tick();
             }
         });
+    });
+
+    socket.on('clear', function (data) {
+        bot.telegram.sendMessage(chatId, '/clear');
+        binance.futuresCancelAll(configs.symbol).then(async value => {
+            if (value.code === 200) {
+                orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
+                await bot.telegram.sendMessage(chatId, 'Done!');
+            } else
+                await bot.telegram.sendMessage(chatId, 'Error!');
+        }).catch(e => console.log(e.code));
+    });
+
+    socket.on('bot', function (data) {
+        bot.launch().then(async r => {
+            await bot.telegram.sendMessage(chatId, 'Bot telegram start');
+        }).catch(e => console.log(e));
     });
 
 });
@@ -207,18 +219,13 @@ bot.command('run', async (ctx) => {
     fs.writeFile(configPath, JSON.stringify(configs), async err => {
         if (err) throw err;
 
-        ctx.reply(chatId, "Bot " + (configs.run ? 'on' : 'off'));
-
-        if (configs.run) {
+        if (configs.run)
             ping.start();
-            bot.start();
-        } else {
-            bot.stop();
+        else
             ping.stop();
-        }
 
-        console.log('Configs: ', configs);
-        console.log("Trade " + (configs.run ? 'on' : 'off'));
+        console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
+        ctx.reply(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
         socket.emit("configs", configs);
         if (configs.run) {
             await tick();
@@ -390,9 +397,8 @@ async function main() {
             } else
                 ping.stop();
 
-            console.log('Configs: ', configs);
-            console.log("Trade " + (configs.run ? 'on' : 'off'));
-            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
+            console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
+            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
         });
         //await binance.futuresOrderStatus('BTCBUSD', {orderId: 98725860}).then(e => console.log(e)).catch(e => console.log(e.code));
     } catch (e) {
@@ -400,8 +406,8 @@ async function main() {
     }
 }
 
-bot.launch().then(r => {
-}).catch(e => console.log(e));
+// bot.launch().then(r => {
+// }).catch(e => console.log(e));
 
 main().then(r => {
 }).catch(e => console.log(e));

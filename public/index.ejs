@@ -90,6 +90,14 @@
                     short: $("#sideS").is(':checked'),
                 });
             });
+
+            $("#clear").click(function () {
+                socket.emit("clear", {});
+            });
+
+            $("#clear").click(function () {
+                socket.emit("bot", {});
+            });
         });
 
     </script>
@@ -124,7 +132,8 @@
             </table>
             <br/>
             <input id="run" type="button" value="ON" name="run"/>
-<!--            <input id="clear" type="button" value="CLEAR" name="clear"/>-->
+            <input id="clear" type="button" value="CLEAR" name="clear"/><br>
+            <input id="bot" type="button" value="Bot On"/>
         </form>
     </div>
 </center>
