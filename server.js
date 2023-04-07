@@ -204,9 +204,7 @@ io.on('connect', function (socket) {
     });
 
     socket.on('bot', function (data) {
-        bot.launch().then(r => {
-            bot.telegram.sendMessage(chatId, 'Bot telegram start');
-        }).catch(e => console.log(e));
+        bot.launch();
     });
 
 });
