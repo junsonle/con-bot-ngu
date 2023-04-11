@@ -171,6 +171,7 @@ io.on('connect', function (socket) {
     io.to(socket.id).emit("configs", configs);
 
     socket.on('run', function (data) {
+        bot.telegram.sendMessage(chatId, '/run');
         configs = data;
         configs.amount = Number(data.amount);
         configs.range = Number(data.range);
@@ -204,6 +205,7 @@ io.on('connect', function (socket) {
     });
 
     socket.on("order", function (data) {
+        bot.telegram.sendMessage(chatId, '/order');
         binance.futuresOpenOrders(configs.symbol).then(values => {
             if (values.length > 0)
                 values.forEach(data => {
@@ -211,10 +213,13 @@ io.on('connect', function (socket) {
                         `${configs.symbol}: ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | ${data.positionSide} | ${data.price}`
                     );
                 });
+            else
+                bot.telegram.sendMessage(chatId, "Null!");
         }).catch(e => console.log(e.code));
     });
 
     socket.on("balance", function (data) {
+        bot.telegram.sendMessage(chatId, '/balance');
         binance.futuresBalance().then(values => {
             if (values.length > 0) {
                 let mess = '';
@@ -222,16 +227,20 @@ io.on('connect', function (socket) {
                     mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl} \n`;
                 }
                 bot.telegram.sendMessage(chatId, mess);
-            }
+            } else
+                bot.telegram.sendMessage(chatId, "Null!");
         }).catch(e => console.log(e.code));
     });
 
     socket.on("position", function (data) {
+        bot.telegram.sendMessage(chatId, '/position');
         binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
             if (position.length > 0)
                 position.forEach(data => {
                     bot.telegram.sendMessage(chatId, `${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
                 });
+            else
+                bot.telegram.sendMessage(chatId, "Null!");
         }).catch(e => console.log(e.code));
     });
 
@@ -361,7 +370,6 @@ async function main() {
             console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
             bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
         });
-        //await binance.futuresOrderStatus('BTCBUSD', {orderId: 98725860}).then(e => console.log(e)).catch(e => console.log(e.code));
     } catch (e) {
         console.log(e);
     }
