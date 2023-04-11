@@ -183,7 +183,7 @@ io.on('connect', function (socket) {
             else
                 ping.stop();
 
-            console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
+            console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
             bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
             socket.emit("configs", configs);
             if (configs.run) {
@@ -203,78 +203,38 @@ io.on('connect', function (socket) {
         }).catch(e => console.log(e.code));
     });
 
-    socket.on('bot', function (data) {
-        bot.launch();
+    socket.on("order", function (data) {
+        binance.futuresOpenOrders(configs.symbol).then(values => {
+            if (values.length > 0)
+                values.forEach(data => {
+                    bot.telegram.sendMessage(chatId,
+                        `${configs.symbol}: ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | ${data.positionSide} | ${data.price}`
+                    );
+                });
+        }).catch(e => console.log(e.code));
     });
 
-});
-
-bot.start((ctx) => {
-    ctx.reply("Welcome to bot");
-});
-bot.command('run', async (ctx) => {
-    configs.run = !configs.run;
-    fs.writeFile(configPath, JSON.stringify(configs), async err => {
-        if (err) throw err;
-
-        if (configs.run)
-            ping.restart();
-        else
-            ping.stop();
-
-        console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
-        ctx.reply(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
-        socket.emit("configs", configs);
-        if (configs.run) {
-            await tick();
-        }
-    });
-});
-bot.command("web", async (ctx) => {
-    ctx.reply(url);
-});
-bot.command("price", async (ctx) => {
-    binance.futuresPrices().then(prices => {
-        ctx.reply(prices[configs.symbol]);
-    }).catch(e => console.log(e.code));
-});
-bot.command("clear", async (ctx) => {
-    binance.futuresCancelAll(configs.symbol).then(value => {
-        if (value.code === 200) {
-            orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
-            ctx.reply('Done!');
-        } else
-            ctx.reply('Error!');
-    }).catch(e => console.log(e.code));
-});
-bot.command("order", async (ctx) => {
-    binance.futuresOpenOrders(configs.symbol).then(values => {
-        if (values.length > 0)
-            values.forEach(data => {
-                ctx.reply(
-                    `${configs.symbol}: ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | ${data.positionSide} | ${data.price}`
-                );
-            });
-    }).catch(e => console.log(e.code));
-});
-bot.command("balance", async (ctx) => {
-    binance.futuresBalance().then(values => {
-        if (values.length > 0) {
-            let mess = '';
-            for (let value of values.filter(f => f.balance != 0)) {
-                mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl} \n`;
+    socket.on("balance", function (data) {
+        binance.futuresBalance().then(values => {
+            if (values.length > 0) {
+                let mess = '';
+                for (let value of values.filter(f => f.balance != 0)) {
+                    mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl} \n`;
+                }
+                bot.telegram.sendMessage(chatId, mess);
             }
-            ctx.reply(mess);
-        }
-    }).catch(e => console.log(e.code));
-});
-bot.command("position", async (ctx) => {
-    binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
-        if (position.length > 0)
-            position.forEach(data => {
-                ctx.reply(`${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
-            });
-    }).catch(e => console.log(e.code));
+        }).catch(e => console.log(e.code));
+    });
+
+    socket.on("position", function (data) {
+        binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
+            if (position.length > 0)
+                position.forEach(data => {
+                    bot.telegram.sendMessage(chatId, `${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
+                });
+        }).catch(e => console.log(e.code));
+    });
+
 });
 
 app.get("/", function (req, res) {
@@ -284,11 +244,7 @@ app.get("/", function (req, res) {
 app.get('/robot.png', (req, res) => res.status(200));
 
 ping.on('up', function (res, state) {
-    console.log('Service is up');
-});
-
-ping.on('stop', function (res, state) {
-    console.log('Service is stop');
+    console.log('Ping service is up', url);
 });
 
 function delay(ms) {
@@ -402,7 +358,7 @@ async function main() {
             else
                 ping.stop();
 
-            console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
+            console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
             bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
         });
         //await binance.futuresOrderStatus('BTCBUSD', {orderId: 98725860}).then(e => console.log(e)).catch(e => console.log(e.code));
@@ -410,9 +366,6 @@ async function main() {
         console.log(e);
     }
 }
-
-// bot.launch().then(r => {
-// }).catch(e => console.log(e));
 
 main().then(r => {
 }).catch(e => console.log(e));

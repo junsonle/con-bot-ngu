@@ -80,7 +80,7 @@
         });
 
         $(document).ready(function () {
-            $("#run").click(function () {
+            $("#run_btn").click(function () {
                 socket.emit("run", {
                     run: !configs.run,
                     symbol: $("#symbol").val(),
@@ -91,12 +91,20 @@
                 });
             });
 
-            $("#clear").click(function () {
+            $("#clear_btn").click(function () {
                 socket.emit("clear", {});
             });
 
-            $("#clear").click(function () {
-                socket.emit("bot", {});
+            $("#balance_btn").click(function () {
+                socket.emit("balance", {});
+            });
+
+            $("#position_btn").click(function () {
+                socket.emit("position", {});
+            });
+
+            $("#order_btn").click(function () {
+                socket.emit("order", {});
             });
         });
 
@@ -131,9 +139,11 @@
                 </tr>
             </table>
             <br/>
-            <input id="run" type="button" value="ON" name="run"/>
-            <input id="clear" type="button" value="CLEAR" name="clear"/><br>
-            <input id="bot" type="button" value="Bot On"/>
+            <input id="run_btn" type="button" value="ON" name="run"/>
+            <input id="clear_btn" type="button" value="CLEAR" name="clear"/><br>
+            <input id="balance_btn" type="button" value="BALANCE" name="balance"/>
+            <input id="position_btn" type="button" value="POSITION" name="position"/>
+            <input id="order_btn" type="button" value="ORDER" name="order"/>
         </form>
     </div>
 </center>
