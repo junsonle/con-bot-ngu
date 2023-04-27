@@ -1,7 +1,7 @@
 const Binance = require('node-binance-api');
 const Express = require("express");
 const {Telegraf} = require("telegraf");
-const  fs = require('fs');
+const fs = require('fs');
 
 const app = Express();
 const server = require("http").Server(app);
@@ -13,7 +13,7 @@ app.set("view engine", "ejs").set("views", "./public");
 const port = process.env.PORT;
 const url = process.env.URL;
 const chatId = process.env.TELEGRAM_ID;
-server.listen(port || 3000);
+server.listen(port);
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const configPath = './config.json';
@@ -56,7 +56,10 @@ function closeShort(price, amount) {
         if (data[0].code)
             console.log(data[0]);
         closeShortId = data[0].orderId;
-    }).catch(e => console.log(e.code));
+    }).catch(e => {
+        closeShortId = null;
+        console.log("Close Short:", price, e.code);
+    });
 }
 
 function closeLong(price, amount) {
@@ -77,7 +80,10 @@ function closeLong(price, amount) {
         if (data[0].code)
             console.log(data[0]);
         closeLongId = data[0].orderId;
-    }).catch(e => console.log(e.code));
+    }).catch(e => {
+        closeLongId = null;
+        console.log("Close Long:", price, e.code);
+    });
 }
 
 function openShort(price, amount) {
@@ -98,7 +104,10 @@ function openShort(price, amount) {
         orderShortId = data[0].orderId;
         if (data[0].code)
             console.log(data[0]);
-    }).catch(e => console.log(e.code));
+    }).catch(e => {
+        orderShortId = null;
+        console.log("Open Short:", price, e.code);
+    });
 }
 
 function openLong(price, amount) {
@@ -119,7 +128,10 @@ function openLong(price, amount) {
         orderLongId = data[0].orderId;
         if (data[0].code)
             console.log(data[0]);
-    }).catch(e => console.log(e.code));
+    }).catch(e => {
+        orderLongId = null;
+        console.log("Open Long:", price, e.code);
+    });
 }
 
 function openShortM(price, amount) {
@@ -139,7 +151,10 @@ function openShortM(price, amount) {
         orderShortMId = data[0].orderId;
         if (data[0].code)
             console.log(data[0]);
-    }).catch(e => console.log(e.code));
+    }).catch(e => {
+        orderShortMId = null;
+        console.log("Open Short Maket:", price, e.code);
+    });
 }
 
 function openLongM(price, amount) {
@@ -159,7 +174,10 @@ function openLongM(price, amount) {
         orderLongMId = data[0].orderId;
         if (data[0].code)
             console.log(data[0]);
-    }).catch(e => console.log(e.code));
+    }).catch(e => {
+        orderLongMId = null;
+        console.log("Open Long Maket:", price, e.code);
+    });
 }
 
 io.on('connect', function (socket) {
@@ -174,15 +192,24 @@ io.on('connect', function (socket) {
         fs.writeFile(configPath, JSON.stringify(configs), async err => {
             if (err) throw err;
 
-            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
-
-            console.log('Configs: ', configs);
-            console.log("Trade " + (configs.run ? 'on' : 'off'));
+            console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
+            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
             socket.emit("configs", configs);
             if (configs.run) {
                 await tick();
             }
         });
+    });
+
+    socket.on('clear', function (data) {
+        bot.telegram.sendMessage(chatId, '/clear');
+        binance.futuresCancelAll(configs.symbol).then(value => {
+            if (value.code === 200) {
+                orderLongId = orderShortId = orderLongMId = orderShortMId = closeLongId = closeShortId = null;
+                bot.telegram.sendMessage(chatId, 'Done!');
+            } else
+                bot.telegram.sendMessage(chatId, 'Error!');
+        }).catch(e => console.log("Cancel All:", e.code));
     });
 
 });
@@ -195,10 +222,8 @@ bot.command('run', async (ctx) => {
     fs.writeFile(configPath, JSON.stringify(configs), async err => {
         if (err) throw err;
 
-        ctx.reply(chatId, "Bot " + (configs.run ? 'on' : 'off'));
-
-        console.log('Configs: ', configs);
-        console.log("Trade " + (configs.run ? 'on' : 'off'));
+        console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
+        ctx.reply("Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
         socket.emit("configs", configs);
         if (configs.run) {
             await tick();
@@ -211,7 +236,7 @@ bot.command("web", async (ctx) => {
 bot.command("price", async (ctx) => {
     binance.futuresPrices().then(prices => {
         ctx.reply(prices[configs.symbol]);
-    }).catch(e => console.log(e.code));
+    }).catch(e => console.log("Get Prices:", e.code));
 });
 bot.command("clear", async (ctx) => {
     binance.futuresCancelAll(configs.symbol).then(value => {
@@ -220,7 +245,7 @@ bot.command("clear", async (ctx) => {
             ctx.reply('Done!');
         } else
             ctx.reply('Error!');
-    }).catch(e => console.log(e.code));
+    }).catch(e => console.log("Cancel All:", e.code));
 });
 bot.command("order", async (ctx) => {
     binance.futuresOpenOrders(configs.symbol).then(values => {
@@ -230,7 +255,9 @@ bot.command("order", async (ctx) => {
                     `${configs.symbol}: ${(data.side === 'BUY' && data.positionSide === 'LONG') || (data.side === 'SELL' && data.positionSide === 'SHORT') ? 'OPEN' : 'CLOSE'} | ${data.positionSide} | ${data.price}`
                 );
             });
-    }).catch(e => console.log(e.code));
+        else
+            ctx.reply("Null!");
+    }).catch(e => console.log("Get Open Orders:", e.code));
 });
 bot.command("balance", async (ctx) => {
     binance.futuresBalance().then(values => {
@@ -240,8 +267,9 @@ bot.command("balance", async (ctx) => {
                 mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl} \n`;
             }
             ctx.reply(mess);
-        }
-    }).catch(e => console.log(e.code));
+        } else
+            ctx.reply("Null!");
+    }).catch(e => console.log("Get Balance:", e.code));
 });
 bot.command("position", async (ctx) => {
     binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
@@ -249,7 +277,9 @@ bot.command("position", async (ctx) => {
             position.forEach(data => {
                 ctx.reply(`${data.symbol}: ${data.positionSide} | ${Math.abs(data.positionAmt)} | ${Number(data.entryPrice).toFixed(2)} | ${Number(data.unRealizedProfit).toFixed(3)}`);
             });
-    }).catch(e => console.log(e.code));
+        else
+            ctx.reply("Null!");
+    }).catch(e => console.log("Get Position Risk:", e.code));
 });
 
 app.get("/", function (req, res) {
@@ -268,7 +298,6 @@ async function tick() {
         await binance.futuresPrices().then(async prices => {
             if (price !== prices[configs.symbol]) {
                 price = prices[configs.symbol];
-//                console.log(price);
                 io.emit("price", `${configs.symbol}: ${price}`);
                 await binance.futuresBalance().then(values => {
                     if (values.length > 0) {
@@ -276,37 +305,36 @@ async function tick() {
                             io.emit("balance", `${Number(value.balance).toFixed(2)} ${value.crossUnPnl > 0 ? '+' : ''}${Number(value.crossUnPnl).toFixed(2)} | BUSD`);
                         });
                     }
-                }).catch(e => console.log(e.code));
+                }).catch(e => console.log("Get Balance:", e.code));
 
-                await binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
+                await binance.futuresPositionRisk({symbol: configs.symbol}).then(async position => {
                     if (position) {
                         //let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
                         if (configs.long) {
                             // close long
                             if (closeLongId !== -1 && position[0].positionAmt >= configs.amount) {
-                                binance.futuresOrderStatus(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
+                                await binance.futuresOrderStatus(configs.symbol, {orderId: `${closeLongId}`}).then(order => {
                                     if (order.status === 'NEW') {
-                                        if (order.price - configs.range * 2 > price && price > position[0].entryPrice - 5)
+                                        if (order.price - configs.range * 2 > price && price > position[0].entryPrice)
                                             closeLong(Math.round(order.price) - configs.range, order.origQty);
                                         //closeLong(Math.round(order.price) - configs.range, Math.max((order.origQty - configs.amount).toFixed(3), configs.amount));
-                                    // } else if (order.status === 'FILLED') {
-                                        //closeLong(Math.round(price) + configs.range, Math.min(configs.amount, position[0].positionAmt));
-                                        // closeLong(Math.round(price) + configs.range, Math.min(configs.amount, position[0].positionAmt));
+                                    } else if (order.status === 'FILLED') {
+                                        closeLong(Math.round(price) + configs.range, Math.min(configs.amount, position[0].positionAmt));
                                     } else {
-                                        closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range, position[0].positionAmt);
+                                        closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range, configs.amount);
                                     }
-                                }).catch(e => console.log(e.code));
+                                }).catch(e => console.log("Get Order Status:", e.code));
                             }
                             // open long limit
                             if (orderLongId !== -1) {
                                 let count = position[0].positionAmt / configs.amount;
                                 let botLong = Number(position[0].entryPrice) - configs.range * (count - 1) / 2;
-                                binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongId}`}).then(order => {
+                                await binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongId}`}).then(order => {
                                     if (count > maxOrder) {
                                         if (order.status !== 'NEW')
                                             openLong(Math.min(Math.round(position[0].entryPrice) - configs.range * count, Math.round(price) - configs.range), configs.amount);
                                     } else if (order.status === 'NEW') {
-                                        if (price - configs.range * 2 > order.price && (price - 5 < botLong || position[0].entryPrice == 0)) {
+                                        if (price - configs.range * 2 > order.price && (price < botLong || position[0].entryPrice == 0)) {
                                             openLong(Math.round(price) - configs.range, order.origQty);
                                         }
                                     } else {
@@ -315,22 +343,23 @@ async function tick() {
                                     // if (order.status === 'FILLED')
                                     //     closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
                                     // closeLong(Math.round(position[0].entryPrice) + configs.range, position[0].positionAmt);
-                                }).catch(e => console.log(e.code));
+                                }).catch(e => console.log("Get Order Status:", e.code));
                             }
                             // open long market
                             if (orderLongMId !== -1) {
-                                let topLong = Number(position[0].entryPrice) + configs.range * (position[0].positionAmt / configs.amount - 1) / 2;
-                                binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongMId}`}).then(order => {
+                                //let topLong = Number(position[0].entryPrice) + configs.range * (position[0].positionAmt / configs.amount - 1) / 2;
+                                await binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongMId}`}).then(order => {
                                     if (order.status === 'NEW') {
-                                        if (order.stopPrice - configs.range * 2 > price && price > topLong - 5) {
+                                        if (order.stopPrice - configs.range * 2 > price) {
                                             openLongM(Math.round(price) + configs.range, order.origQty);
                                         }
                                     } else {
                                         // openLongM(Math.round(Math.max(price, position[0].entryPrice)) + configs.range, configs.amount);
                                         // openLongM(Math.round(position[0].entryPrice > price ? position[0].entryPrice : price) + configs.range, configs.amount);
-                                        openLongM(Math.round(topLong > price ? topLong : price) + configs.range, configs.amount);
+                                        // openLongM(Math.round(topLong > price ? topLong : price) + configs.range, configs.amount);
+                                        openLongM(Math.round(price) + configs.range, configs.amount);
                                     }
-                                }).catch(e => console.log(e.code));
+                                }).catch(e => console.log("Get Order Status:", e.code));
                             }
                         }
 
@@ -339,29 +368,28 @@ async function tick() {
                         if (configs.short) {
                             // close short
                             if (closeShortId !== -1 && position[1].positionAmt <= -configs.amount) {
-                                binance.futuresOrderStatus(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
+                                await binance.futuresOrderStatus(configs.symbol, {orderId: `${closeShortId}`}).then(order => {
                                     if (order.status === 'NEW') {
-                                        if (price - configs.range * 2 > order.price && price - 5 < position[1].entryPrice)
+                                        if (price - configs.range * 2 > order.price && price < position[1].entryPrice)
                                             closeShort(Math.round(order.price) + configs.range, order.origQty);
                                         //closeShort(Math.round(order.price) + configs.range, Math.max((order.origQty - configs.amount).toFixed(3), configs.amount));
-                                    // } else if (order.status === 'FILLED') {
-                                        //closeShort(Math.round(price) - configs.range, Math.min(configs.amount, position[0].positionAmt));
-                                        // closeShort(Math.round(price) - configs.range, Math.min(configs.amount, -position[1].positionAmt));
+                                    } else if (order.status === 'FILLED') {
+                                        closeShort(Math.round(price) - configs.range, Math.min(configs.amount, -position[1].positionAmt));
                                     } else {
-                                        closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, -position[1].positionAmt);
+                                        closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, configs.amount);
                                     }
-                                }).catch(e => console.log(e.code));
+                                }).catch(e => console.log("Get Order Status:", e.code));
                             }
                             // open short limit
                             if (orderShortId !== -1) {
                                 let count = position[1].positionAmt / -configs.amount;
                                 let topShort = Number(position[1].entryPrice) + configs.range * (count - 1) / 2;
-                                binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortId}`}).then(order => {
+                                await binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortId}`}).then(order => {
                                     if (count > maxOrder) {
                                         if (order.status !== 'NEW')
                                             openShort(Math.max(Math.round(position[1].entryPrice) + configs.range * count, Math.round(price) + configs.range), configs.amount);
                                     } else if (order.status === 'NEW') {
-                                        if (order.price - configs.range * 2 > price && (price > topShort - 5 || position[1].entryPrice == 0)) {
+                                        if (order.price - configs.range * 2 > price && (price > topShort || position[1].entryPrice == 0)) {
                                             openShort(Math.round(price) + configs.range, order.origQty);
                                         }
                                     } else {
@@ -370,26 +398,27 @@ async function tick() {
                                     // if (order.status === 'FILLED')
                                     //     closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
                                     // closeShort(Math.round(position[1].entryPrice) - configs.range, 0 - position[1].positionAmt);
-                                }).catch(e => console.log(e.code));
+                                }).catch(e => console.log("Get Order Status:", e.code));
                             }
                             //open short market
                             if (orderShortMId !== -1) {
-                                let botShort = Number(position[1].entryPrice) - configs.range * (position[1].positionAmt / -configs.amount - 1) / 2;
-                                binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortMId}`}).then(order => {
+                                //let botShort = Number(position[1].entryPrice) - configs.range * (position[1].positionAmt / -configs.amount - 1) / 2;
+                                await binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortMId}`}).then(order => {
                                     if (order.status === 'NEW') {
-                                        if (price - configs.range * 2 > order.stopPrice && price - 5 < botShort) {
+                                        if (price - configs.range * 2 > order.stopPrice) {
                                             openShortM(Math.round(price) - configs.range, order.origQty);
                                         }
                                     } else {
                                         // openShortM(Math.round(Math.min(price, position[1].entryPrice)) - configs.range, configs.amount);
                                         //openShortM(Math.round(position[1].entryPrice > 0 && position[1].entryPrice < price ? position[1].entryPrice : price) - configs.range, configs.amount);
-                                        openShortM(Math.round(position[1].entryPrice > 0 && botShort < price ? botShort : price) - configs.range, configs.amount);
+                                        //openShortM(Math.round(position[1].entryPrice > 0 && botShort < price ? botShort : price) - configs.range, configs.amount);
+                                        openShortM(Math.round(price) - configs.range, configs.amount);
                                     }
-                                }).catch(e => console.log(e.code));
+                                }).catch(e => console.log("Get Order Status:", e.code));
                             }
                         }
                     }
-                }).catch(e => console.log(e.code));
+                }).catch(e => console.log("Get Position Risk:", e.code));
             } else //if (orderLongId !== -1 && orderShortId !== -1 && orderLongMId !== -1 && orderShortMId !== -1 && closeLongId !== -1 && closeShortId !== -1)
                 await binance.futuresOpenOrders(configs.symbol).then(orders => {
                     if (orders.length > 0) {
@@ -414,8 +443,8 @@ async function tick() {
                             }
                         });
                     }
-                }).catch(e => console.log(e.code));
-        }).catch(e => console.log(e.code));
+                }).catch(e => console.log("Get OpenOrders:", e.code));
+        }).catch(e => console.log("Get Prices:", e.code));
         await delay(200);
     }
 }
@@ -426,19 +455,19 @@ async function main() {
             if (err) throw err;
             configs = JSON.parse(data);
 
-            if (configs.run) {
+            if (configs.run)
                 tick();
-            }
 
-            console.log('Configs: ', configs);
-            console.log("Trade " + (configs.run ? 'on' : 'off'));
-            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off'));
+            console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
+            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
         });
     } catch (e) {
-        console.log(e.code);
+        console.log("Read File:", e);
     }
 }
 
-bot.launch().then(r => {}).catch(e => console.log(e.code));
+bot.launch().then(r => {
+}).catch(e => console.log("Launch Bot:", e));
 
-main().then(r => {}).catch(e => console.log(e.code));
+main().then(r => {
+}).catch(e => console.log("Run Main:", e));
