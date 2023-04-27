@@ -350,14 +350,14 @@ async function tick() {
                                 //let topLong = Number(position[0].entryPrice) + configs.range * (position[0].positionAmt / configs.amount - 1) / 2;
                                 await binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongMId}`}).then(order => {
                                     if (order.status === 'NEW') {
-                                        if (order.stopPrice - configs.range * 2 > price) {
+                                        if (order.stopPrice - configs.range * 2 > price && price > position[0].entryPrice) {
                                             openLongM(Math.round(price) + configs.range, order.origQty);
                                         }
                                     } else {
-                                        // openLongM(Math.round(Math.max(price, position[0].entryPrice)) + configs.range, configs.amount);
+                                        openLongM(Math.round(Math.max(price, position[0].entryPrice)) + configs.range, configs.amount);
                                         // openLongM(Math.round(position[0].entryPrice > price ? position[0].entryPrice : price) + configs.range, configs.amount);
                                         // openLongM(Math.round(topLong > price ? topLong : price) + configs.range, configs.amount);
-                                        openLongM(Math.round(price) + configs.range, configs.amount);
+                                        // openLongM(Math.round(price) + configs.range, configs.amount);
                                     }
                                 }).catch(e => console.log("Get Order Status:", e.code));
                             }
@@ -405,14 +405,14 @@ async function tick() {
                                 //let botShort = Number(position[1].entryPrice) - configs.range * (position[1].positionAmt / -configs.amount - 1) / 2;
                                 await binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortMId}`}).then(order => {
                                     if (order.status === 'NEW') {
-                                        if (price - configs.range * 2 > order.stopPrice) {
+                                        if (price - configs.range * 2 > order.stopPrice && price < position[1].entryPrice) {
                                             openShortM(Math.round(price) - configs.range, order.origQty);
                                         }
                                     } else {
-                                        // openShortM(Math.round(Math.min(price, position[1].entryPrice)) - configs.range, configs.amount);
+                                        openShortM(Math.round(Math.min(price, position[1].entryPrice)) - configs.range, configs.amount);
                                         //openShortM(Math.round(position[1].entryPrice > 0 && position[1].entryPrice < price ? position[1].entryPrice : price) - configs.range, configs.amount);
                                         //openShortM(Math.round(position[1].entryPrice > 0 && botShort < price ? botShort : price) - configs.range, configs.amount);
-                                        openShortM(Math.round(price) - configs.range, configs.amount);
+                                        // openShortM(Math.round(price) - configs.range, configs.amount);
                                     }
                                 }).catch(e => console.log("Get Order Status:", e.code));
                             }
