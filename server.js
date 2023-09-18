@@ -2,6 +2,7 @@ const Binance = require('node-binance-api');
 const Express = require("express");
 const {Telegraf} = require("telegraf");
 const fs = require('fs');
+const os = require("os");
 
 const app = Express();
 const server = require("http").Server(app);
@@ -16,7 +17,7 @@ const chatId = process.env.TELEGRAM_ID;
 server.listen(port);
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
-const configPath = './config.json';
+const envPath = './.env';
 const binance = new Binance().options({
     APIKEY: process.env.APIKEY,
     APISECRET: process.env.APISECRET,
@@ -29,7 +30,20 @@ const binance = new Binance().options({
     }
 });
 
-let configs = {}
+function setEnvValue(key, value) {
+    // read file from hdd & split if from a linebreak to a array
+    const ENV_VARS = fs.readFileSync(envPath, "utf8").split(os.EOL);
+    // find the env we want based on the key
+    const target = ENV_VARS.indexOf(ENV_VARS.find((line) => {
+        return line.match(new RegExp(key));
+    }));
+    // replace the key/value with the new value
+    ENV_VARS.splice(target, 1, `${key}=${value}`);
+    // write everything back to the file system
+    fs.writeFileSync(envPath, ENV_VARS.join(os.EOL));
+}
+
+let configs = {};
 let maxOrder = 10;
 let orderLongId;
 let orderShortId;
@@ -182,23 +196,21 @@ function openLongM(price, amount) {
 
 io.on('connect', function (socket) {
 
-    io.to(socket.id).emit("configs", configs);
+    socket.emit("configs", configs);
 
-    socket.on('run', function (data) {
+    socket.on('run', async function (data) {
         configs = data;
         configs.amount = Number(data.amount);
         configs.range = Number(data.range);
 
-        fs.writeFile(configPath, JSON.stringify(configs), async err => {
-            if (err) throw err;
+        setEnvValue("config", JSON.stringify(configs));
 
-            console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
-            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
-            socket.emit("configs", configs);
-            if (configs.run) {
-                await tick();
-            }
-        });
+        console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
+        await bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
+        socket.emit("configs", configs);
+        if (configs.run) {
+            await tick();
+        }
     });
 
     socket.on('clear', function (data) {
@@ -219,16 +231,15 @@ bot.start((ctx) => {
 });
 bot.command('run', async (ctx) => {
     configs.run = !configs.run;
-    fs.writeFile(configPath, JSON.stringify(configs), async err => {
-        if (err) throw err;
 
-        console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
-        ctx.reply("Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
-        socket.emit("configs", configs);
-        if (configs.run) {
-            await tick();
-        }
-    });
+    setEnvValue("config", JSON.stringify(configs));
+
+    console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
+    ctx.reply("Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
+    io.emit("configs", configs);
+    if (configs.run) {
+        await tick();
+    }
 });
 bot.command("web", async (ctx) => {
     ctx.reply(url);
@@ -450,20 +461,13 @@ async function tick() {
 }
 
 async function main() {
-    try {
-        await fs.readFile(configPath, 'utf8', (err, data) => {
-            if (err) throw err;
-            configs = JSON.parse(data);
+    configs = JSON.parse(process.env.config);
 
-            if (configs.run)
-                tick();
+    if (configs.run)
+        tick();
 
-            console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
-            bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
-        });
-    } catch (e) {
-        console.log("Error Read File:", e);
-    }
+    console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
+    bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
 }
 
 bot.launch().then(r => {
