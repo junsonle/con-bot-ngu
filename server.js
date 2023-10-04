@@ -3,7 +3,6 @@ const Express = require("express");
 const {Telegraf} = require("telegraf");
 const fs = require('fs');
 const os = require("os");
-const e = require("express");
 
 const app = Express();
 const server = require("http").Server(app);
@@ -44,6 +43,7 @@ function setEnvValue(key, value) {
     fs.writeFileSync(envPath, ENV_VARS.join(os.EOL));
 }
 
+let profitPoint = process.env.profit;
 let balanceCoin = 'BUSD';
 let configs = {};
 let maxOrder = 10;
@@ -215,11 +215,10 @@ io.on('connect', function (socket) {
                 if (values.length > 0) {
                     let balance = values.find(f => configs.symbol.indexOf(f.asset) > 0);
                     setEnvValue("profit", balance.balance);
+                    profitPoint = balance.balance;
                 }
             }).catch(e => console.log("Error Get Balance:", e));
             await tick();
-        } else {
-            setEnvValue("profit", 0);
         }
     });
 
@@ -253,11 +252,10 @@ bot.command('run', async (ctx) => {
             if (values.length > 0) {
                 let balance = values.find(f => configs.symbol.indexOf(f.asset) > 0);
                 setEnvValue("profit", balance.balance);
+                profitPoint = balance.balance;
             }
         }).catch(e => console.log("Error Get Balance:", e));
         await tick();
-    } else {
-        setEnvValue("profit", 0);
     }
 });
 
@@ -311,7 +309,7 @@ bot.command("profit", async (ctx) => {
     binance.futuresBalance().then(values => {
         if (values.length > 0) {
             let balance = values.find(f => configs.symbol.indexOf(f.asset) > 0);
-            ctx.reply(`${balance.asset}: ${balance.balance - process.env.profit} | ${balance.crossUnPnl}`);
+            ctx.reply(`${balance.asset}: ${balance.balance - profitPoint} | ${balance.crossUnPnl}`);
         } else
             ctx.reply("Null!");
     }).catch(e => console.log("Error Get Profit:", e));
