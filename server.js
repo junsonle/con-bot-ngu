@@ -3,6 +3,7 @@ const Express = require("express");
 const {Telegraf} = require("telegraf");
 const fs = require('fs');
 const os = require("os");
+const e = require("express");
 
 const app = Express();
 const server = require("http").Server(app);
@@ -43,6 +44,7 @@ function setEnvValue(key, value) {
     fs.writeFileSync(envPath, ENV_VARS.join(os.EOL));
 }
 
+let balanceCoin = 'BUSD';
 let configs = {};
 let maxOrder = 10;
 let orderLongId;
@@ -72,7 +74,7 @@ function closeShort(price, amount) {
         closeShortId = data[0].orderId;
     }).catch(e => {
         closeShortId = null;
-        console.log("Error Close Short:", price, e.code);
+        console.log("Error Close Short:", price, e);
     });
 }
 
@@ -96,7 +98,7 @@ function closeLong(price, amount) {
         closeLongId = data[0].orderId;
     }).catch(e => {
         closeLongId = null;
-        console.log("Error Close Long:", price, e.code);
+        console.log("Error Close Long:", price, e);
     });
 }
 
@@ -120,7 +122,7 @@ function openShort(price, amount) {
             console.log(data[0]);
     }).catch(e => {
         orderShortId = null;
-        console.log("Error Open Short:", price, e.code);
+        console.log("Error Open Short:", price, e);
     });
 }
 
@@ -144,7 +146,7 @@ function openLong(price, amount) {
             console.log(data[0]);
     }).catch(e => {
         orderLongId = null;
-        console.log("Error Open Long:", price, e.code);
+        console.log("Error Open Long:", price, e);
     });
 }
 
@@ -167,7 +169,7 @@ function openShortM(price, amount) {
             console.log(data[0]);
     }).catch(e => {
         orderShortMId = null;
-        console.log("Error Open Short Maket:", price, e.code);
+        console.log("Error Open Short Maket:", price, e);
     });
 }
 
@@ -190,7 +192,7 @@ function openLongM(price, amount) {
             console.log(data[0]);
     }).catch(e => {
         orderLongMId = null;
-        console.log("Error Open Long Maket:", price, e.code);
+        console.log("Error Open Long Maket:", price, e);
     });
 }
 
@@ -209,7 +211,15 @@ io.on('connect', function (socket) {
         await bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
         socket.emit("configs", configs);
         if (configs.run) {
+            await binance.futuresBalance().then(values => {
+                if (values.length > 0) {
+                    let balance = values.find(f => configs.symbol.indexOf(f.asset) > 0);
+                    setEnvValue("profit", balance.balance);
+                }
+            }).catch(e => console.log("Error Get Balance:", e));
             await tick();
+        } else {
+            setEnvValue("profit", 0);
         }
     });
 
@@ -221,7 +231,7 @@ io.on('connect', function (socket) {
                 bot.telegram.sendMessage(chatId, 'Done!');
             } else
                 bot.telegram.sendMessage(chatId, 'Error!');
-        }).catch(e => console.log("Error Cancel All:", e.code));
+        }).catch(e => console.log("Error Cancel All:", e));
     });
 
 });
@@ -229,6 +239,7 @@ io.on('connect', function (socket) {
 bot.start((ctx) => {
     ctx.reply("Welcome to bot");
 });
+
 bot.command('run', async (ctx) => {
     configs.run = !configs.run;
 
@@ -238,17 +249,28 @@ bot.command('run', async (ctx) => {
     ctx.reply("Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
     io.emit("configs", configs);
     if (configs.run) {
+        await binance.futuresBalance().then(values => {
+            if (values.length > 0) {
+                let balance = values.find(f => configs.symbol.indexOf(f.asset) > 0);
+                setEnvValue("profit", balance.balance);
+            }
+        }).catch(e => console.log("Error Get Balance:", e));
         await tick();
+    } else {
+        setEnvValue("profit", 0);
     }
 });
+
 bot.command("web", async (ctx) => {
     ctx.reply(url);
 });
+
 bot.command("price", async (ctx) => {
     binance.futuresPrices().then(prices => {
         ctx.reply(prices[configs.symbol]);
-    }).catch(e => console.log("Error Get Prices:", e.code));
+    }).catch(e => console.log("Error Get Prices:", e));
 });
+
 bot.command("clear", async (ctx) => {
     binance.futuresCancelAll(configs.symbol).then(value => {
         if (value.code === 200) {
@@ -256,8 +278,9 @@ bot.command("clear", async (ctx) => {
             ctx.reply('Done!');
         } else
             ctx.reply('Error!');
-    }).catch(e => console.log("Error Cancel All:", e.code));
+    }).catch(e => console.log("Error Cancel All:", e));
 });
+
 bot.command("order", async (ctx) => {
     binance.futuresOpenOrders(configs.symbol).then(values => {
         if (values.length > 0)
@@ -268,8 +291,9 @@ bot.command("order", async (ctx) => {
             });
         else
             ctx.reply("Null!");
-    }).catch(e => console.log("Error Get Open Orders:", e.code));
+    }).catch(e => console.log("Error Get Open Orders:", e));
 });
+
 bot.command("balance", async (ctx) => {
     binance.futuresBalance().then(values => {
         if (values.length > 0) {
@@ -280,8 +304,19 @@ bot.command("balance", async (ctx) => {
             ctx.reply(mess);
         } else
             ctx.reply("Null!");
-    }).catch(e => console.log("Error Get Balance:", e.code));
+    }).catch(e => console.log("Error Get Balance:", e));
 });
+
+bot.command("profit", async (ctx) => {
+    binance.futuresBalance().then(values => {
+        if (values.length > 0) {
+            let balance = values.find(f => configs.symbol.indexOf(f.asset) > 0);
+            ctx.reply(`${balance.asset}: ${balance.balance - process.env.profit} | ${balance.crossUnPnl}`);
+        } else
+            ctx.reply("Null!");
+    }).catch(e => console.log("Error Get Profit:", e));
+});
+
 bot.command("position", async (ctx) => {
     binance.futuresPositionRisk({symbol: configs.symbol}).then(position => {
         if (position.length > 0)
@@ -290,7 +325,7 @@ bot.command("position", async (ctx) => {
             });
         else
             ctx.reply("Null!");
-    }).catch(e => console.log("Error Get Position Risk:", e.code));
+    }).catch(e => console.log("Error Get Position:", e));
 });
 
 app.get("/", function (req, res) {
@@ -312,11 +347,11 @@ async function tick() {
                 io.emit("price", `${configs.symbol}: ${price}`);
                 await binance.futuresBalance().then(values => {
                     if (values.length > 0) {
-                        values.filter(o => o.asset === 'BUSD').forEach(value => {
-                            io.emit("balance", `${Number(value.balance).toFixed(2)} ${value.crossUnPnl > 0 ? '+' : ''}${Number(value.crossUnPnl).toFixed(2)} | BUSD`);
+                        values.filter(o => o.asset === balanceCoin).forEach(value => {
+                            io.emit("balance", `${Number(value.balance).toFixed(2)} ${value.crossUnPnl > 0 ? '+' : ''}${Number(value.crossUnPnl).toFixed(2)} | ${balanceCoin}`);
                         });
                     }
-                }).catch(e => console.log("Error Get Balance:", e.code));
+                }).catch(e => console.log("Error Get Balance:", e));
 
                 await binance.futuresPositionRisk({symbol: configs.symbol}).then(async position => {
                     if (position) {
@@ -334,7 +369,7 @@ async function tick() {
                                     } else {
                                         closeLong(Math.round(Math.max(position[0].entryPrice, price)) + configs.range, configs.amount);
                                     }
-                                }).catch(e => console.log("Error Get Order Status:", e.code));
+                                }).catch(e => console.log("Error Get Order Status:", e));
                             }
                             // open long limit
                             if (orderLongId !== -1) {
@@ -354,7 +389,7 @@ async function tick() {
                                     // if (order.status === 'FILLED')
                                     //     closeLong(Math.round(position[0].entryPrice) + configs.range, configs.amount);
                                     // closeLong(Math.round(position[0].entryPrice) + configs.range, position[0].positionAmt);
-                                }).catch(e => console.log("Error Get Order Status:", e.code));
+                                }).catch(e => console.log("Error Get Order Status:", e));
                             }
                             // open long market
                             if (orderLongMId !== -1) {
@@ -365,12 +400,12 @@ async function tick() {
                                             openLongM(Math.round(price) + configs.range, order.origQty);
                                         }
                                     } else {
-                                        openLongM(Math.round(Math.max(price, position[0].entryPrice)) + configs.range, configs.amount);
+                                        openLongM(Math.round(position[0].entryPrice > price ? position[0].entryPrice : price) + configs.range, configs.amount);
                                         // openLongM(Math.round(position[0].entryPrice > price ? position[0].entryPrice : price) + configs.range, configs.amount);
                                         // openLongM(Math.round(topLong > price ? topLong : price) + configs.range, configs.amount);
                                         // openLongM(Math.round(price) + configs.range, configs.amount);
                                     }
-                                }).catch(e => console.log("Error Get Order Status:", e.code));
+                                }).catch(e => console.log("Error Get Order Status:", e));
                             }
                         }
 
@@ -389,7 +424,7 @@ async function tick() {
                                     } else {
                                         closeShort(Math.round(Math.min(position[1].entryPrice, price)) - configs.range, configs.amount);
                                     }
-                                }).catch(e => console.log("Error Get Order Status:", e.code));
+                                }).catch(e => console.log("Error Get Order Status:", e));
                             }
                             // open short limit
                             if (orderShortId !== -1) {
@@ -409,7 +444,7 @@ async function tick() {
                                     // if (order.status === 'FILLED')
                                     //     closeShort(Math.round(position[1].entryPrice) - configs.range, configs.amount);
                                     // closeShort(Math.round(position[1].entryPrice) - configs.range, 0 - position[1].positionAmt);
-                                }).catch(e => console.log("Error Get Order Status:", e.code));
+                                }).catch(e => console.log("Error Get Order Status:", e));
                             }
                             //open short market
                             if (orderShortMId !== -1) {
@@ -420,16 +455,16 @@ async function tick() {
                                             openShortM(Math.round(price) - configs.range, order.origQty);
                                         }
                                     } else {
-                                        openShortM(Math.round(Math.min(price, position[1].entryPrice)) - configs.range, configs.amount);
+                                        openShortM(Math.round(position[1].entryPrice > 0 && position[1].entryPrice < price ? position[1].entryPrice : price) - configs.range, configs.amount);
                                         //openShortM(Math.round(position[1].entryPrice > 0 && position[1].entryPrice < price ? position[1].entryPrice : price) - configs.range, configs.amount);
                                         //openShortM(Math.round(position[1].entryPrice > 0 && botShort < price ? botShort : price) - configs.range, configs.amount);
                                         // openShortM(Math.round(price) - configs.range, configs.amount);
                                     }
-                                }).catch(e => console.log("Error Get Order Status:", e.code));
+                                }).catch(e => console.log("Error Get Order Status:", e));
                             }
                         }
                     }
-                }).catch(e => console.log("Error Get Position Risk:", e.code));
+                }).catch(e => console.log("Error Get Position Risk:", e));
             } else //if (orderLongId !== -1 && orderShortId !== -1 && orderLongMId !== -1 && orderShortMId !== -1 && closeLongId !== -1 && closeShortId !== -1)
                 await binance.futuresOpenOrders(configs.symbol).then(orders => {
                     if (orders.length > 0) {
@@ -454,8 +489,8 @@ async function tick() {
                             }
                         });
                     }
-                }).catch(e => console.log("Error Get OpenOrders:", e.code));
-        }).catch(e => console.log("Error Get Prices:", e.code));
+                }).catch(e => console.log("Error Get OpenOrders:", e));
+        }).catch(e => console.log("Error Get Prices:", e));
         await delay(200);
     }
 }
