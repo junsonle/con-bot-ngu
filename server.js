@@ -18,6 +18,7 @@ server.listen(port);
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const envPath = './.env';
+const configPath = './config.json';
 const binance = new Binance().options({
     APIKEY: process.env.APIKEY,
     APISECRET: process.env.APISECRET,
@@ -41,6 +42,12 @@ function setEnvValue(key, value) {
     ENV_VARS.splice(target, 1, `${key}=${value}`);
     // write everything back to the file system
     fs.writeFileSync(envPath, ENV_VARS.join(os.EOL));
+}
+
+function setConfigs(configs) {
+    fs.writeFile(configPath, JSON.stringify(configs), async err => {
+        if (err) throw err;
+    });
 }
 
 let profitPoint = process.env.profit;
@@ -205,7 +212,7 @@ io.on('connect', function (socket) {
         configs.amount = Number(data.amount);
         configs.range = Number(data.range);
 
-        setEnvValue("config", JSON.stringify(configs));
+        setConfigs(configs);
 
         console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
         await bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
@@ -213,9 +220,9 @@ io.on('connect', function (socket) {
         if (configs.run) {
             await binance.futuresBalance().then(values => {
                 if (values.length > 0) {
-                    let balance = values.find(f => configs.symbol.indexOf(f.asset) > 0);
-                    setEnvValue("profit", balance.balance);
-                    profitPoint = balance.balance;
+                    configs.profit = values.find(f => configs.symbol.indexOf(f.asset) > 0)?.balance;
+                    setConfigs(configs);
+                    profitPoint = configs.profit;
                 }
             }).catch(e => console.log("Error Get Balance:", e));
             await tick();
@@ -242,7 +249,7 @@ bot.start((ctx) => {
 bot.command('run', async (ctx) => {
     configs.run = !configs.run;
 
-    setEnvValue("config", JSON.stringify(configs));
+    setConfigs(configs);
 
     console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
     ctx.reply("Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
@@ -250,9 +257,9 @@ bot.command('run', async (ctx) => {
     if (configs.run) {
         await binance.futuresBalance().then(values => {
             if (values.length > 0) {
-                let balance = values.find(f => configs.symbol.indexOf(f.asset) > 0);
-                setEnvValue("profit", balance.balance);
-                profitPoint = balance.balance;
+                configs.profit = values.find(f => configs.symbol.indexOf(f.asset) > 0)?.balance;
+                setConfigs(configs);
+                profitPoint = configs.profit;
             }
         }).catch(e => console.log("Error Get Balance:", e));
         await tick();
@@ -494,14 +501,18 @@ async function tick() {
 }
 
 async function main() {
-    configs = JSON.parse(process.env.config);
-    balanceCoin = configs.symbol.replace("BTC", "");
+    await fs.readFile(configPath, 'utf8', (err, data) => {
+        if (err) throw err;
+        configs = JSON.parse(data);
+        console.log(configs.symbol);
+        balanceCoin = configs.symbol.replace("BTC", "");
 
-    if (configs.run)
-        tick();
+        if (configs.run)
+            tick();
 
-    console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
-    bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
+        console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
+        bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
+    });
 }
 
 // bot.launch().then(r => {
