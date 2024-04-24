@@ -44,7 +44,7 @@ function setEnvValue(key, value) {
 }
 
 let profitPoint = process.env.profit;
-let balanceCoin = 'BUSD';
+let balanceCoin;
 let configs = {};
 let maxOrder = 10;
 let orderLongId;
@@ -209,7 +209,7 @@ io.on('connect', function (socket) {
 
         console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
         await bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
-        socket.emit("configs", configs);
+        io.emit("configs", configs);
         if (configs.run) {
             await binance.futuresBalance().then(values => {
                 if (values.length > 0) {
@@ -495,6 +495,7 @@ async function tick() {
 
 async function main() {
     configs = JSON.parse(process.env.config);
+    balanceCoin = configs.symbol.replace("BTC", "");
 
     if (configs.run)
         tick();
@@ -503,8 +504,8 @@ async function main() {
     bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
 }
 
-bot.launch().then(r => {
-}).catch(e => console.log("Error Launch Bot:", e));
+// bot.launch().then(r => {
+// }).catch(e => console.log("Error Launch Bot:", e));
 
 main().then(r => {
 }).catch(e => console.log("Error Run Main:", e));
