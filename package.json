@@ -15,6 +15,7 @@
     "ejs": "^3.1.9",
     "express": "^4.17.3",
     "node-binance-api": "^0.13.1",
+    "ping-monitor": "^0.8.2",
     "socket.io": "^4.4.1",
     "telegraf": "^4.11.2"
   }

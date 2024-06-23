@@ -1,5 +1,6 @@
 const Binance = require('node-binance-api');
 const Express = require("express");
+const Monitor = require('ping-monitor');
 const {Telegraf} = require("telegraf");
 const fs = require('fs');
 
@@ -27,6 +28,10 @@ const binance = new Binance().options({
         combineStream: 'wss://testnet.binance.vision/stream?streams=',
         stream: 'wss://testnet.binance.vision/ws/'
     }
+});
+let ping = new Monitor({
+    website: url,
+    interval: 10 // minutes
 });
 
 let configs = {}
@@ -196,8 +201,10 @@ io.on('connect', function (socket) {
             bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
             socket.emit("configs", configs);
             if (configs.run) {
+                ping.restart();
                 await tick();
-            }
+            } else
+                ping.stop();
         });
     });
 
@@ -226,8 +233,10 @@ bot.command('run', async (ctx) => {
         ctx.reply("Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
         io.emit("configs", configs);
         if (configs.run) {
+            ping.restart();
             await tick();
-        }
+        } else
+            ping.stop();
     });
 });
 bot.command("web", async (ctx) => {
@@ -286,6 +295,14 @@ app.get("/", function (req, res) {
 });
 
 app.get('/robot.png', (req, res) => res.status(200));
+
+ping.on('up', function (res, state) {
+    console.log('Service is up');
+});
+
+ping.on('stop', function (res, state) {
+    console.log('Service is stop');
+});
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -457,6 +474,8 @@ async function main() {
 
             if (configs.run)
                 tick();
+            else
+                ping.stop();
 
             console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs: ", configs);
             bot.telegram.sendMessage(chatId, "Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
