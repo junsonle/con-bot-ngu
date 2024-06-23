@@ -224,7 +224,7 @@ bot.command('run', async (ctx) => {
 
         console.log("Trade " + (configs.run ? 'on' : 'off') + "\nConfigs:", configs);
         ctx.reply("Bot " + (configs.run ? 'on' : 'off') + "\nConfigs: " + JSON.stringify(configs));
-        socket.emit("configs", configs);
+        io.emit("configs", configs);
         if (configs.run) {
             await tick();
         }
@@ -235,7 +235,7 @@ bot.command("web", async (ctx) => {
 });
 bot.command("price", async (ctx) => {
     binance.futuresPrices().then(prices => {
-        ctx.reply(prices[configs.symbol]);
+        ctx.reply(prices[configs.symbol] ? prices[configs.symbol] : 'error!');
     }).catch(e => console.log("Get Prices:", e.code));
 });
 bot.command("clear", async (ctx) => {
@@ -261,14 +261,13 @@ bot.command("order", async (ctx) => {
 });
 bot.command("balance", async (ctx) => {
     binance.futuresBalance().then(values => {
+        let mess = '';
         if (values.length > 0) {
-            let mess = '';
             for (let value of values.filter(f => f.balance != 0)) {
                 mess += `${value.asset}: ${value.balance} | ${value.crossUnPnl} \n`;
             }
-            ctx.reply(mess);
-        } else
-            ctx.reply("Null!");
+        }
+        ctx.reply(mess === '' ? "Null!" : mess);
     }).catch(e => console.log("Get Balance:", e.code));
 });
 bot.command("position", async (ctx) => {
@@ -299,15 +298,16 @@ async function tick() {
             if (price !== prices[configs.symbol]) {
                 price = prices[configs.symbol];
                 io.emit("price", `${configs.symbol}: ${price}`);
-                await binance.futuresBalance().then(values => {
+                binance.futuresBalance().then(values => {
                     if (values.length > 0) {
-                        values.filter(o => o.asset === 'BUSD').forEach(value => {
-                            io.emit("balance", `${Number(value.balance).toFixed(2)} ${value.crossUnPnl > 0 ? '+' : ''}${Number(value.crossUnPnl).toFixed(2)} | BUSD`);
+                        let sy = configs.symbol.replace("BTC", "");
+                        values.filter(o => o.asset === sy).forEach(value => {
+                            io.emit("balance", `${Number(value.balance).toFixed(2)} ${value.crossUnPnl > 0 ? '+' : ''}${Number(value.crossUnPnl).toFixed(2)} | ${sy}`);
                         });
                     }
                 }).catch(e => console.log("Get Balance:", e.code));
 
-                await binance.futuresPositionRisk({symbol: configs.symbol}).then(async position => {
+                binance.futuresPositionRisk({symbol: configs.symbol}).then(async position => {
                     if (position) {
                         //let x = (Number(position[1].positionAmt) + Number(position[0].positionAmt)).toFixed(3);
                         if (configs.long) {
@@ -346,7 +346,7 @@ async function tick() {
                                 }).catch(e => console.log("Get Order Status:", e.code));
                             }
                             // open long market
-                            if (orderLongMId !== -1) {
+                            if (orderLongMId === -1) {
                                 //let topLong = Number(position[0].entryPrice) + configs.range * (position[0].positionAmt / configs.amount - 1) / 2;
                                 await binance.futuresOrderStatus(configs.symbol, {orderId: `${orderLongMId}`}).then(order => {
                                     if (order.status === 'NEW') {
@@ -401,7 +401,7 @@ async function tick() {
                                 }).catch(e => console.log("Get Order Status:", e.code));
                             }
                             //open short market
-                            if (orderShortMId !== -1) {
+                            if (orderShortMId === -1) {
                                 //let botShort = Number(position[1].entryPrice) - configs.range * (position[1].positionAmt / -configs.amount - 1) / 2;
                                 await binance.futuresOrderStatus(configs.symbol, {orderId: `${orderShortMId}`}).then(order => {
                                     if (order.status === 'NEW') {
@@ -466,8 +466,8 @@ async function main() {
     }
 }
 
-bot.launch().then(r => {
-}).catch(e => console.log("Launch Bot:", e));
+// bot.launch().then(r => {
+// }).catch(e => console.log("Launch Bot:", e));
 
 main().then(r => {
 }).catch(e => console.log("Run Main:", e));
