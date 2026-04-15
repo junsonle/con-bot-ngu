@@ -1,0 +1,63 @@
+{
+  "basePrice": 74187.2,
+  "startEquity": 4825.38638727,
+  "peakEquity": 4825.38638727,
+  "realProfit": -0.1787270000004355,
+  "cycleCount": 0,
+  "botStatus": "IDLE",
+  "savedAt": 1776278026886,
+  "slots": [
+    {
+      "name": "nearBuy",
+      "entrySide": "BUY",
+      "tpSide": "SELL",
+      "posSide": "LONG",
+      "direction": -1,
+      "distMult": 1,
+      "entryPrice": 74137.2,
+      "tpPrice": 74187.2,
+      "orderId": 326538712,
+      "status": "ENTRY",
+      "fillCount": 0
+    },
+    {
+      "name": "nearSell",
+      "entrySide": "SELL",
+      "tpSide": "BUY",
+      "posSide": "SHORT",
+      "direction": 1,
+      "distMult": 1,
+      "entryPrice": 74237.2,
+      "tpPrice": 74187.2,
+      "orderId": 326538905,
+      "status": "TP",
+      "fillCount": 0
+    },
+    {
+      "name": "farBuy",
+      "entrySide": "BUY",
+      "tpSide": "SELL",
+      "posSide": "LONG",
+      "direction": -1,
+      "distMult": 3,
+      "entryPrice": 74037.2,
+      "tpPrice": 74087.2,
+      "orderId": 326538717,
+      "status": "ENTRY",
+      "fillCount": 0
+    },
+    {
+      "name": "farSell",
+      "entrySide": "SELL",
+      "tpSide": "BUY",
+      "posSide": "SHORT",
+      "direction": 1,
+      "distMult": 3,
+      "entryPrice": 74337.2,
+      "tpPrice": 74287.2,
+      "orderId": 326538723,
+      "status": "ENTRY",
+      "fillCount": 0
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "symbol": "BTCUSDC",
+  "run": true,
+  "gridSpacing": 50,
+  "catchMultiplier": 3,
+  "orderSize": 0.003,
+  "leverage": 20,
+  "enableLong": true,
+  "enableShort": true,
+  "atr": {
+    "period": 14,
+    "klineInterval": "15m",
+    "updateIntervalMs": 300000,
+    "defaultValue": 300
+  },
+  "drawdown": {
+    "trailingEnabled": true,
+    "maxPercent": 15
+  },
+  "tickIntervalMs": 3000
+}
