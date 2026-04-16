@@ -1,21 +1,50 @@
 {
   "symbol": "BTCUSDC",
   "run": true,
-  "gridSpacing": 50,
-  "catchMultiplier": 3,
-  "orderSize": 0.003,
   "leverage": 20,
-  "enableLong": true,
-  "enableShort": true,
-  "atr": {
-    "period": 14,
-    "klineInterval": "15m",
-    "updateIntervalMs": 300000,
-    "defaultValue": 300
+  "gridSpacing": 50,
+  "catchMultiplier": 5,
+  "orderSize": 0.01,
+  "nearDirection": "BOTH",
+  "enableFarBuy": true,
+  "enableFarSell": true,
+  "recenterThreshold": 2.5,
+  "slMultiplier": 4,
+  "maxNearLayers": 3,
+  "farAdjustThreshold": 0.5,
+  "takeProfit": {
+    "slowExitSpacing": 1,
+    "fastScaleOut": [
+      0.5,
+      0.3,
+      0.2
+    ],
+    "minProfitToClose": 0.5
+  },
+  "hedge": {
+    "enableStopMarket": true,
+    "stopMarketSpacing": 1,
+    "autoHedgeThreshold": 2,
+    "hedgeUnlockMinProfit": 1.5
+  },
+  "volatility": {
+    "priceSurgeMultiplier": 4,
+    "volumeSurgeMultiplier": 5,
+    "minPriceSurgeRatio": 0.4,
+    "minVolumeDelta": 150,
+    "pauseTicks": 5
   },
   "drawdown": {
     "trailingEnabled": true,
     "maxPercent": 15
   },
-  "tickIntervalMs": 3000
+  "tickIntervalMs": 3000,
+  "grid": {
+    "spacing": 50,
+    "orderSize": 0.01,
+    "maxNearLayers": 3,
+    "farMultiplier": 6,
+    "farAdjustThreshold": 0.5,
+    "nearDirection": "BOTH"
+  }
 }

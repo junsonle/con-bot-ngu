@@ -1,46 +1,24 @@
 /**
- * ============================================================
- *  4-SLOT GRID BOT v3.0 - Binance Futures Testnet
- *  Pair: BTCUSDC | Hedge Mode
- * ============================================================
- *  Architecture: Exactly 4 limit orders at all times
- *    - nearBuy:  BUY LONG   at base - spacing       (lưới gần - dưới)
- *    - nearSell: SELL SHORT  at base + spacing       (lưới gần - trên)
- *    - farBuy:   BUY LONG   at base - spacing * catch (bắt giá giảm mạnh)
- *    - farSell:  SELL SHORT  at base + spacing * catch (bắt giá tăng mạnh)
- *
- *  After any TP fills → recenter grid at current price
- *  Profit = Current Equity - Start Equity (100% accurate)
- * ============================================================
+ * HYBRID GRID ENGINE v5.0 - Binance Futures Testnet
+ * Multi-tier Position Management + Floating Grid + STOP_MARKET Hedge
  */
-
 const Binance = require('node-binance-api');
 const Express = require('express');
 const { Telegraf } = require('telegraf');
-const { ATR } = require('technicalindicators');
 const fs = require('fs');
 const crypto = require('crypto');
 const axios = require('axios');
 require('dotenv').config();
 
-// ===================== CONSTANTS =====================
 const CONFIG_PATH = './grid-config.json';
 const STATE_PATH = './grid-state.json';
 const FUTURES_TESTNET = 'https://testnet.binancefuture.com';
 const PORT = 3001;
 
-// ===================== CLIENTS =====================
 const binance = new Binance().options({
-    APIKEY: process.env.APIKEY,
-    APISECRET: process.env.APISECRET,
-    test: true,
-    urls: {
-        base: 'https://testnet.binance.vision/api/',
-        combineStream: 'wss://testnet.binance.vision/stream?streams=',
-        stream: 'wss://fstream.binancefuture.com'
-    }
+    APIKEY: process.env.APIKEY, APISECRET: process.env.APISECRET, test: true,
+    urls: { base: 'https://testnet.binance.vision/api/', combineStream: 'wss://testnet.binance.vision/stream?streams=', stream: 'wss://fstream.binancefuture.com' }
 });
-
 const tgBot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const chatId = process.env.TELEGRAM_ID;
 const app = Express();
@@ -50,451 +28,516 @@ const io = require('socket.io')(server, { cors: { origin: '*' } });
 // ===================== STATE =====================
 let config = {};
 let running = false;
-let basePrice = 0;
 let tickCount = 0;
+let startEquity = 0, realProfit = 0, peakEquity = 0;
+let configVersion = 0, configWatcher = null;
+let botStatus = 'IDLE', cycleCount = 0;
 
-// Equity tracking
-let startEquity = 0;
-let realProfit = 0;
-let peakEquity = 0;
-
-// ATR
-let currentATR = 0;
-let avgATR = 0;
-let lastATRUpdate = 0;
-
-let botStatus = 'IDLE';
-let cycleCount = 0; // Total completed TP cycles
+// Volatility tracking
+let prevTickPrice = 0, prevTradeCount = 0;
+let rsPriceEma = 0, rsTradeEma = 0, volatileTicksRemaining = 0;
 
 /**
- * 4 ORDER SLOTS - the entire grid engine
- * Each slot: { name, entrySide, posSide, direction, distMult,
- *              entryPrice, tpPrice, orderId, status, fillPrice }
- * 
- * Status: IDLE → ENTRY → FILLED → TP → (TP fills) → IDLE (auto-recycle)
- * direction: -1 = buy below base, +1 = sell above base
+ * POSITION CLUSTER: Dynamic collection of orders per side
+ * longCluster: { layers: [{price, qty, orderId, status, type}], tpOrders: [...], stopOrderId }
+ * shortCluster: same structure
  */
-const slots = [];
+let longCluster = { layers: [], tpOrders: [], stopOrderId: null, avgPrice: 0 };
+let shortCluster = { layers: [], tpOrders: [], stopOrderId: null, avgPrice: 0 };
+let farBuyOrder = { price: 0, orderId: null, status: 'IDLE' };
+let farSellOrder = { price: 0, orderId: null, status: 'IDLE' };
+let anchorPrice = 0; // center of the grid
 
 // ===================== HELPERS =====================
 const delay = ms => new Promise(r => setTimeout(r, ms));
 const roundPrice = p => Math.round(p * 100) / 100;
 const roundQty = q => Math.round(q * 1000) / 1000;
 const now = () => new Date().toLocaleTimeString('vi-VN');
-
-function log(tag, msg) {
-    const line = `[${now()}] [${tag}] ${msg}`;
-    console.log(line);
-    io.emit('log', line);
-    return line;
-}
-
-function notify(msg) {
-    log('TG', msg);
-    tgBot.telegram.sendMessage(chatId, msg).catch(() => {});
-}
+function log(tag, msg) { const line = `[${now()}] [${tag}] ${msg}`; console.log(line); io.emit('log', line); return line; }
+function notify(msg) { log('TG', msg); tgBot.telegram.sendMessage(chatId, msg).catch(() => {}); }
 
 // ===================== CONFIG =====================
+const DEFAULTS = {
+    symbol: 'BTCUSDC', run: false, leverage: 20,
+    gridSpacing: 50, catchMultiplier: 6, orderSize: 0.01,
+    nearDirection: 'BOTH', enableFarBuy: true, enableFarSell: true,
+    recenterThreshold: 2.5, slMultiplier: 4,
+    
+    // New Advanced Parameters added directly
+    maxNearLayers: 3, 
+    farAdjustThreshold: 0.5,
+    takeProfit: { slowExitSpacing: 1, fastScaleOut: [0.5, 0.3, 0.2], minProfitToClose: 0.5 },
+    hedge: { enableStopMarket: true, stopMarketSpacing: 1, autoHedgeThreshold: 2, hedgeUnlockMinProfit: 1.5 },
+    volatility: { priceSurgeMultiplier: 4, volumeSurgeMultiplier: 5, minPriceSurgeRatio: 0.4, minVolumeDelta: 150, pauseTicks: 5 },
+    drawdown: { trailingEnabled: true, maxPercent: 15 },
+    tickIntervalMs: 3000
+};
+
 function loadConfig() {
     try {
-        config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-        if (!config.catchMultiplier) config.catchMultiplier = 3;
-        if (!config.tickIntervalMs) config.tickIntervalMs = 3000;
-        if (!config.drawdown) config.drawdown = { maxPercent: 15, trailingEnabled: true };
-        if (!config.atr) config.atr = { period: 14, klineInterval: '1h', updateIntervalMs: 300000, defaultValue: 300 };
+        const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+        config = { ...DEFAULTS, ...raw };
+        config.takeProfit = { ...DEFAULTS.takeProfit, ...(raw.takeProfit || {}) };
+        config.hedge = { ...DEFAULTS.hedge, ...(raw.hedge || {}) };
+        config.volatility = { ...DEFAULTS.volatility, ...(raw.volatility || {}) };
+        config.drawdown = { ...DEFAULTS.drawdown, ...(raw.drawdown || {}) };
+        configVersion++;
         return true;
-    } catch (e) {
-        log('CFG', `Error: ${e.message}`);
-        return false;
-    }
+    } catch (e) { log('CFG', `Error: ${e.message}`); return false; }
 }
+function saveConfig() { try { fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2)); } catch (e) {} }
 
-function saveConfig() {
-    try { fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2)); } catch (e) {}
+function startConfigWatcher() {
+    if (configWatcher) return;
+    let debounce = null;
+    configWatcher = fs.watch(CONFIG_PATH, () => {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(() => { if (loadConfig()) log('CFG', `🔄 Hot-reload v${configVersion}`); }, 500);
+    });
+    log('CFG', '👁 Watcher started');
 }
 
 // ===================== STATE PERSISTENCE =====================
 function saveState() {
     try {
-        const state = {
-            basePrice, startEquity, peakEquity, realProfit, cycleCount,
-            botStatus, savedAt: Date.now(),
-            slots: slots.map(s => ({
-                name: s.name, entrySide: s.entrySide, tpSide: s.tpSide,
-                posSide: s.posSide, direction: s.direction, distMult: s.distMult,
-                entryPrice: s.entryPrice, tpPrice: s.tpPrice,
-                orderId: s.orderId, status: s.status, fillCount: s.fillCount
-            }))
-        };
-        fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
-    } catch (e) {
-        log('STATE', `Save error: ${e.message}`);
-    }
+        fs.writeFileSync(STATE_PATH, JSON.stringify({
+            anchorPrice, startEquity, peakEquity, realProfit, cycleCount, botStatus, savedAt: Date.now(),
+            longCluster: { layers: longCluster.layers, stopOrderId: longCluster.stopOrderId, avgPrice: longCluster.avgPrice },
+            shortCluster: { layers: shortCluster.layers, stopOrderId: shortCluster.stopOrderId, avgPrice: shortCluster.avgPrice },
+            farBuyOrder, farSellOrder
+        }, null, 2));
+    } catch (e) { log('STATE', `Save err: ${e.message}`); }
 }
+function clearState() { try { if (fs.existsSync(STATE_PATH)) fs.unlinkSync(STATE_PATH); } catch (e) {} }
 
-function loadState() {
-    try {
-        if (!fs.existsSync(STATE_PATH)) return null;
-        const state = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
-        if (!state.slots || !state.basePrice) return null;
-        return state;
-    } catch (e) {
-        log('STATE', `Load error: ${e.message}`);
-        return null;
-    }
-}
-
-function clearState() {
-    try { if (fs.existsSync(STATE_PATH)) fs.unlinkSync(STATE_PATH); } catch (e) {}
-}
-
-/**
- * RECOVERY: Reconstruct slots from saved state + real Binance data
- * Called when bot restarts with config.run = true
- * 
- * Logic per slot:
- *   Saved ENTRY → check if orderId still in openOrders
- *     - yes → keep ENTRY (order still waiting)
- *     - no  → order filled while down → check position → FILLED or IDLE
- *   Saved TP → check if orderId still in openOrders
- *     - yes → keep TP (waiting for TP fill)
- *     - no  → TP filled while down → IDLE (cycle completed)
- *   Saved FILLED → has position, needs TP → stay FILLED
- *   Saved IDLE → just place new entry
- */
-async function recoverFromState() {
-    const state = loadState();
-    if (!state) return false;
-
-    const ageMs = Date.now() - (state.savedAt || 0);
-    const ageMin = Math.round(ageMs / 60000);
-    log('RECOVER', `Found state from ${ageMin} min ago | Base:$${state.basePrice} | Cycles:${state.cycleCount}`);
-
-    // Fetch real data from Binance
-    const [orders, positions] = await Promise.all([
-        binance.futuresOpenOrders(config.symbol).catch(() => []),
-        binance.futuresPositionRisk({ symbol: config.symbol }).catch(() => [])
-    ]);
-
-    const openOrderIds = new Set(orders.map(o => o.orderId));
-    const openOrderMap = new Map(orders.map(o => [o.orderId, o]));
-
-    // Get actual position quantities
-    const longQty = Math.abs(Number(positions.find(p => p.positionSide === 'LONG')?.positionAmt || 0));
-    const shortQty = Math.abs(Number(positions.find(p => p.positionSide === 'SHORT')?.positionAmt || 0));
-
-    log('RECOVER', `Binance: ${orders.length} orders | LONG:${longQty} SHORT:${shortQty}`);
-
-    // Restore global state
-    basePrice = state.basePrice;
-    startEquity = state.startEquity;
-    peakEquity = state.peakEquity || 0;
-    cycleCount = state.cycleCount || 0;
-    realProfit = state.realProfit || 0;
-
-    // Reconstruct slots
-    slots.length = 0;
-    for (const saved of state.slots) {
-        const slot = {
-            name: saved.name, entrySide: saved.entrySide, tpSide: saved.tpSide,
-            posSide: saved.posSide, direction: saved.direction, distMult: saved.distMult,
-            entryPrice: saved.entryPrice, tpPrice: saved.tpPrice,
-            orderId: saved.orderId, status: saved.status, fillCount: saved.fillCount || 0
-        };
-
-        const hasPos = (slot.posSide === 'LONG' && longQty >= config.orderSize * 0.9)
-                    || (slot.posSide === 'SHORT' && shortQty >= config.orderSize * 0.9);
-
-        switch (saved.status) {
-            case 'ENTRY':
-                if (saved.orderId && openOrderIds.has(saved.orderId)) {
-                    // Order still open → keep as-is
-                    log('RECOVER', `  ${slot.name}: ENTRY ✓ (order ${saved.orderId} still open)`);
-                } else if (hasPos) {
-                    // Order gone + position exists → entry filled while down
-                    log('RECOVER', `  ${slot.name}: ENTRY → FILLED (pos exists, order gone)`);
-                    slot.status = 'FILLED';
-                    slot.orderId = null;
-                } else {
-                    // Order gone + no position → entry expired or cancelled
-                    log('RECOVER', `  ${slot.name}: ENTRY → IDLE (order gone, no pos)`);
-                    slot.status = 'IDLE';
-                    slot.orderId = null;
-                }
-                break;
-
-            case 'TP':
-                if (saved.orderId && openOrderIds.has(saved.orderId)) {
-                    // TP order still open → waiting for fill
-                    log('RECOVER', `  ${slot.name}: TP ✓ (order ${saved.orderId} still open)`);
-                } else if (hasPos) {
-                    // TP gone but still has position → TP cancelled? → re-place TP
-                    log('RECOVER', `  ${slot.name}: TP → FILLED (pos exists, TP order gone)`);
-                    slot.status = 'FILLED';
-                    slot.orderId = null;
-                } else {
-                    // TP gone + no position → TP filled! Cycle complete
-                    log('RECOVER', `  ${slot.name}: TP → IDLE (TP filled while down)`);
-                    slot.status = 'IDLE';
-                    slot.orderId = null;
-                    slot.fillCount++;
-                    cycleCount++;
-                }
-                break;
-
-            case 'FILLED':
-                if (hasPos) {
-                    // Has position, needs TP → keep FILLED
-                    log('RECOVER', `  ${slot.name}: FILLED ✓ (pos exists, will place TP)`);
-                } else {
-                    // No position → already closed somehow
-                    log('RECOVER', `  ${slot.name}: FILLED → IDLE (no pos found)`);
-                    slot.status = 'IDLE';
-                    slot.orderId = null;
-                }
-                break;
-
-            case 'IDLE':
-            default:
-                log('RECOVER', `  ${slot.name}: IDLE ✓`);
-                slot.status = 'IDLE';
-                slot.orderId = null;
-                break;
-        }
-
-        slots.push(slot);
-    }
-
-    // Clean up any orphan orders not tracked by slots
-    const trackedIds = new Set(slots.filter(s => s.orderId).map(s => s.orderId));
-    for (const order of orders) {
-        if (!trackedIds.has(order.orderId)) {
-            log('RECOVER', `  Cancelling orphan order ${order.orderId} ${order.side} @ ${order.price}`);
-            await cancelOrder(order.orderId);
-        }
-    }
-
-    log('RECOVER', `✅ Recovery complete | Base:$${basePrice} | Cycles:${cycleCount}`);
-    notify(`🔄 Bot RECOVERED\nBase: $${basePrice} | Cycles: ${cycleCount}\nStart Eq: $${startEquity.toFixed(2)}`);
-    saveState();
-    return true;
-}
-
-// ===================== SIGNED API HELPER =====================
+// ===================== SIGNED API =====================
 async function signedRequest(method, path, params = {}) {
-    const timestamp = Date.now();
-    const allParams = { ...params, timestamp };
-    const query = Object.entries(allParams).map(([k, v]) => `${k}=${v}`).join('&');
-    const signature = crypto.createHmac('sha256', process.env.APISECRET).update(query).digest('hex');
-    const url = `${FUTURES_TESTNET}${path}?${query}&signature=${signature}`;
-    const headers = { 'X-MBX-APIKEY': process.env.APIKEY };
-    if (method === 'GET') return (await axios.get(url, { headers })).data;
-    return (await axios.post(url, null, { headers })).data;
+    const ts = Date.now();
+    const allP = { ...params, timestamp: ts };
+    const q = Object.entries(allP).map(([k, v]) => `${k}=${v}`).join('&');
+    const sig = crypto.createHmac('sha256', process.env.APISECRET).update(q).digest('hex');
+    const url = `${FUTURES_TESTNET}${path}?${q}&signature=${sig}`;
+    const h = { 'X-MBX-APIKEY': process.env.APIKEY };
+    return method === 'GET' ? (await axios.get(url, { headers: h })).data : (await axios.post(url, null, { headers: h })).data;
 }
 
 // ===================== ACCOUNT SETUP =====================
 async function setupAccount() {
-    try {
-        await signedRequest('POST', '/fapi/v1/positionSide/dual', { dualSidePosition: 'true' });
-        log('SETUP', 'Hedge mode ENABLED');
-    } catch (e) {
-        if (e.response?.data?.code === -4059) log('SETUP', 'Hedge mode ✓');
-        else log('SETUP', `Hedge error: ${e.response?.data?.msg || e.message}`);
-    }
-    try { await binance.futuresLeverage(config.symbol, config.leverage); log('SETUP', `Leverage ${config.leverage}x ✓`); } catch (e) {}
-    try { await binance.futuresMarginType(config.symbol, 'CROSSED'); log('SETUP', 'Margin CROSSED ✓'); } catch (e) {}
+    try { await signedRequest('POST', '/fapi/v1/positionSide/dual', { dualSidePosition: 'true' }); log('SETUP', 'Hedge ON'); }
+    catch (e) { if (e.response?.data?.code === -4059) log('SETUP', 'Hedge ✓'); }
+    try { await binance.futuresLeverage(config.symbol, config.leverage); } catch (e) {}
+    try { await binance.futuresMarginType(config.symbol, 'CROSSED'); } catch (e) {}
 }
 
-// ===================== ATR =====================
-async function updateATR() {
-    if (Date.now() - lastATRUpdate < config.atr.updateIntervalMs) return;
-    try {
-        const candles = await signedRequest('GET', '/fapi/v1/klines', {
-            symbol: config.symbol, interval: config.atr.klineInterval, limit: 50
-        });
-        if (!candles || candles.length < config.atr.period + 1) return;
-        const atrValues = ATR.calculate({
-            high: candles.map(c => parseFloat(c[2])),
-            low: candles.map(c => parseFloat(c[3])),
-            close: candles.map(c => parseFloat(c[4])),
-            period: config.atr.period
-        });
-        if (atrValues.length > 0) {
-            currentATR = atrValues[atrValues.length - 1];
-            avgATR = atrValues.reduce((a, b) => a + b, 0) / atrValues.length;
-        }
-    } catch (e) {
-        if (currentATR === 0) { currentATR = config.atr.defaultValue; avgATR = config.atr.defaultValue; }
-    }
-    lastATRUpdate = Date.now();
-}
-
-// ===================== ORDER PLACEMENT =====================
+// ===================== ORDER API =====================
 async function placeLimit(side, posSide, price, qty) {
     const params = {
         symbol: config.symbol, side, type: 'LIMIT', positionSide: posSide,
         quantity: `${roundQty(qty)}`, price: `${roundPrice(price)}`,
-        timeInForce: 'GTC', newOrderRespType: 'ACK'
+        timeInForce: 'GTX', newOrderRespType: 'ACK'
     };
     try {
         const data = await binance.futuresMultipleOrders([params]);
         const r = data[0];
-        if (r.code) { log('ORDER', `❌ ${side} ${posSide} @ ${price}: ${r.msg}`); return null; }
-        log('ORDER', `✅ ${side} ${posSide} LIMIT @ ${price} qty=${qty} id=${r.orderId}`);
+        if (r.code) {
+            if (Number(r.code) === -2010 || (r.msg && r.msg.indexOf('Post Only') !== -1)) {
+                log('ORDER', `🛡 GTX reject ${side} ${posSide} @ ${price}`);
+                return 'REJECTED_GTX';
+            }
+            log('ORDER', `❌ LIMIT ${side} ${posSide} @ ${price}: ${r.msg}`); return null;
+        }
+        log('ORDER', `✅ LIMIT ${side} ${posSide} @ ${price} qty=${qty} id=${r.orderId}`);
         return r.orderId;
-    } catch (e) { log('ORDER', `❌ ${side} ${posSide} @ ${price}: ${e.message}`); return null; }
+    } catch (e) { log('ORDER', `❌ LIMIT err: ${e.message}`); return null; }
+}
+
+async function placeStopMarket(side, posSide, stopPrice, qty) {
+    try {
+        const data = await binance.futuresMultipleOrders([{
+            symbol: config.symbol, side, type: 'STOP_MARKET', positionSide: posSide,
+            quantity: `${roundQty(qty)}`, stopPrice: `${roundPrice(stopPrice)}`, closePosition: 'false'
+        }]);
+        const r = data[0];
+        if (r.code) { log('ORDER', `❌ STOP_MKT ${side} ${posSide} @ ${stopPrice}: ${r.msg}`); return null; }
+        log('ORDER', `✅ STOP_MKT ${side} ${posSide} @ ${stopPrice} qty=${qty} id=${r.orderId}`);
+        return r.orderId;
+    } catch (e) { log('ORDER', `❌ STOP_MKT err: ${e.message}`); return null; }
 }
 
 async function placeMarket(side, posSide, qty) {
-    const params = {
-        symbol: config.symbol, side, type: 'MARKET', positionSide: posSide,
-        quantity: `${roundQty(qty)}`, newOrderRespType: 'ACK'
-    };
     try {
-        const data = await binance.futuresMultipleOrders([params]);
+        const data = await binance.futuresMultipleOrders([{
+            symbol: config.symbol, side, type: 'MARKET', positionSide: posSide,
+            quantity: `${roundQty(qty)}`, newOrderRespType: 'ACK'
+        }]);
         const r = data[0];
         if (r.code) { log('ORDER', `❌ MKT ${side} ${posSide}: ${r.msg}`); return null; }
         log('ORDER', `✅ MKT ${side} ${posSide} qty=${qty}`);
         return r.orderId;
-    } catch (e) { log('ORDER', `❌ MKT ${side} ${posSide}: ${e.message}`); return null; }
+    } catch (e) { log('ORDER', `❌ MKT err: ${e.message}`); return null; }
 }
 
 async function cancelOrder(orderId) {
-    try {
-        await binance.futuresCancel(config.symbol, { orderId: `${orderId}` });
-        return true;
-    } catch (e) { return false; }
+    try { await binance.futuresCancel(config.symbol, { orderId: `${orderId}` }); return true; } catch (e) { return false; }
 }
-
 async function cancelAllOrders() {
     try { await binance.futuresCancelAll(config.symbol); log('ORDER', '🗑 ALL cancelled'); } catch (e) {}
 }
 
-// ===================== SLOT SYSTEM =====================
-
-function initSlots(price) {
-    basePrice = roundPrice(price);
-    const spacing = config.gridSpacing;
-    const catchMult = config.catchMultiplier || 3;
-
-    slots.length = 0;
-    slots.push({
-        name: 'nearBuy', entrySide: 'BUY', tpSide: 'SELL', posSide: 'LONG',
-        direction: -1, distMult: 1,
-        entryPrice: roundPrice(basePrice - spacing),
-        tpPrice: roundPrice(basePrice),
-        orderId: null, status: 'IDLE', fillCount: 0
-    });
-    slots.push({
-        name: 'nearSell', entrySide: 'SELL', tpSide: 'BUY', posSide: 'SHORT',
-        direction: +1, distMult: 1,
-        entryPrice: roundPrice(basePrice + spacing),
-        tpPrice: roundPrice(basePrice),
-        orderId: null, status: 'IDLE', fillCount: 0
-    });
-    slots.push({
-        name: 'farBuy', entrySide: 'BUY', tpSide: 'SELL', posSide: 'LONG',
-        direction: -1, distMult: catchMult,
-        entryPrice: roundPrice(basePrice - spacing * catchMult),
-        tpPrice: roundPrice(basePrice - spacing * (catchMult - 1)),
-        orderId: null, status: 'IDLE', fillCount: 0
-    });
-    slots.push({
-        name: 'farSell', entrySide: 'SELL', tpSide: 'BUY', posSide: 'SHORT',
-        direction: +1, distMult: catchMult,
-        entryPrice: roundPrice(basePrice + spacing * catchMult),
-        tpPrice: roundPrice(basePrice + spacing * (catchMult - 1)),
-        orderId: null, status: 'IDLE', fillCount: 0
-    });
-
-    log('GRID', `Base: $${basePrice} | Spacing: $${spacing} | Catch: ${catchMult}x`);
-    for (const s of slots) {
-        log('GRID', `  ${s.name}: entry=${s.entryPrice} → tp=${s.tpPrice}`);
-    }
+// ===================== CLUSTER HELPERS =====================
+function clusterQty(cluster) {
+    return cluster.layers.filter(l => l.status === 'FILLED').reduce((s, l) => s + l.qty, 0);
+}
+function clusterAvgPrice(cluster) {
+    const filled = cluster.layers.filter(l => l.status === 'FILLED');
+    if (filled.length === 0) return 0;
+    const totalCost = filled.reduce((s, l) => s + l.price * l.qty, 0);
+    const totalQty = filled.reduce((s, l) => s + l.qty, 0);
+    return roundPrice(totalCost / totalQty);
+}
+function clusterPendingCount(cluster) {
+    return cluster.layers.filter(l => l.status === 'PENDING').length;
+}
+function clusterFilledCount(cluster) {
+    return cluster.layers.filter(l => l.status === 'FILLED').length;
 }
 
-function recenterSlots(newPrice) {
-    const oldBase = basePrice;
-    basePrice = roundPrice(newPrice);
-    const spacing = config.gridSpacing;
-    const catchMult = config.catchMultiplier || 3;
+// ===================== CORE ENGINE =====================
 
-    for (const s of slots) {
-        if (s.status !== 'IDLE') continue;
-        if (s.direction === -1) {
-            s.entryPrice = roundPrice(basePrice - spacing * s.distMult);
-            s.tpPrice = roundPrice(basePrice - spacing * (s.distMult - 1));
-        } else {
-            s.entryPrice = roundPrice(basePrice + spacing * s.distMult);
-            s.tpPrice = roundPrice(basePrice + spacing * (s.distMult - 1));
+/**
+ * MODULE 1: Near Grid (Floating Limit Grid)
+ * - Place 2 limit orders bracketing current price
+ * - On fill: add new layer in same direction + move opposite order closer
+ * - Max layers controlled by config.grid.maxNearLayers
+ */
+async function processNearGrid(price, openOrderIds) {
+    const spacing = config.gridSpacing;
+    const maxLayers = config.maxNearLayers;
+    let changed = false;
+
+    // === LONG SIDE ===
+    if (config.nearDirection !== 'SHORT_ONLY') {
+        const pendingLongs = longCluster.layers.filter(l => l.status === 'PENDING');
+        const filledLongs = longCluster.layers.filter(l => l.status === 'FILLED');
+
+        // Check fills
+        for (const layer of pendingLongs) {
+            if (!openOrderIds.has(layer.orderId)) {
+                layer.status = 'FILLED';
+                log('GRID', `📦 LONG filled @ ${layer.price} (layer ${filledLongs.length + 1})`);
+                notify(`📦 LONG filled @ ${layer.price}`);
+                changed = true;
+            }
+        }
+
+        // Place new entry if room
+        const totalLongLayers = longCluster.layers.filter(l => l.status === 'PENDING' || l.status === 'FILLED').length;
+        if (totalLongLayers === 0) {
+            // No orders at all - place first buy below price
+            const buyPrice = roundPrice(price - spacing);
+            const oid = await placeLimit('BUY', 'LONG', buyPrice, config.orderSize);
+            if (oid && oid !== 'REJECTED_GTX') {
+                longCluster.layers.push({ price: buyPrice, qty: config.orderSize, orderId: oid, status: 'PENDING', type: 'LIMIT' });
+                changed = true;
+            }
+        } else if (changed) {
+            // Just had a fill - place next layer deeper if under max
+            const newFilledLongs = longCluster.layers.filter(l => l.status === 'FILLED');
+            if (newFilledLongs.length < maxLayers) {
+                const deepest = Math.min(...newFilledLongs.map(l => l.price));
+                const nextPrice = roundPrice(deepest - spacing);
+                const oid = await placeLimit('BUY', 'LONG', nextPrice, config.orderSize);
+                if (oid && oid !== 'REJECTED_GTX') {
+                    longCluster.layers.push({ price: nextPrice, qty: config.orderSize, orderId: oid, status: 'PENDING', type: 'LIMIT' });
+                }
+            }
         }
     }
 
-    log('GRID', `📐 Recenter: $${oldBase} → $${basePrice}`);
+    // === SHORT SIDE ===
+    if (config.nearDirection !== 'LONG_ONLY') {
+        const pendingShorts = shortCluster.layers.filter(l => l.status === 'PENDING');
+        const filledShorts = shortCluster.layers.filter(l => l.status === 'FILLED');
+
+        for (const layer of pendingShorts) {
+            if (!openOrderIds.has(layer.orderId)) {
+                layer.status = 'FILLED';
+                log('GRID', `📦 SHORT filled @ ${layer.price} (layer ${filledShorts.length + 1})`);
+                notify(`📦 SHORT filled @ ${layer.price}`);
+                changed = true;
+            }
+        }
+
+        const totalShortLayers = shortCluster.layers.filter(l => l.status === 'PENDING' || l.status === 'FILLED').length;
+        if (totalShortLayers === 0) {
+            const sellPrice = roundPrice(price + spacing);
+            const oid = await placeLimit('SELL', 'SHORT', sellPrice, config.orderSize);
+            if (oid && oid !== 'REJECTED_GTX') {
+                shortCluster.layers.push({ price: sellPrice, qty: config.orderSize, orderId: oid, status: 'PENDING', type: 'LIMIT' });
+                changed = true;
+            }
+        } else if (changed) {
+            const newFilledShorts = shortCluster.layers.filter(l => l.status === 'FILLED');
+            if (newFilledShorts.length < maxLayers) {
+                const highest = Math.max(...newFilledShorts.map(l => l.price));
+                const nextPrice = roundPrice(highest + spacing);
+                const oid = await placeLimit('SELL', 'SHORT', nextPrice, config.orderSize);
+                if (oid && oid !== 'REJECTED_GTX') {
+                    shortCluster.layers.push({ price: nextPrice, qty: config.orderSize, orderId: oid, status: 'PENDING', type: 'LIMIT' });
+                }
+            }
+        }
+    }
+
+    // Update avg prices
+    longCluster.avgPrice = clusterAvgPrice(longCluster);
+    shortCluster.avgPrice = clusterAvgPrice(shortCluster);
+
+    if (changed) saveState();
+    return changed;
+}
+
+/**
+ * MODULE 2: Far Orders (Anchor Catchers)
+ * - Sit far from price, catch flash wicks
+ * - Only adjust when price drifts > 50% of distance
+ */
+async function processFarOrders(price, openOrderIds) {
+    if (!config.enableFarBuy && !config.enableFarSell) return;
+    const farDist = config.gridSpacing * config.catchMultiplier;
+    const adjustThreshold = config.farAdjustThreshold;
+
+    // Far Buy
+    if (config.enableFarBuy) {
+        if (farBuyOrder.status === 'IDLE' || !farBuyOrder.orderId) {
+            const fbPrice = roundPrice(price - farDist);
+            const oid = await placeLimit('BUY', 'LONG', fbPrice, config.orderSize);
+            if (oid && oid !== 'REJECTED_GTX') {
+                farBuyOrder = { price: fbPrice, orderId: oid, status: 'PENDING' };
+            }
+        } else if (farBuyOrder.status === 'PENDING') {
+            if (!openOrderIds.has(farBuyOrder.orderId)) {
+                // Far buy filled! Add to long cluster
+                log('GRID', `🎣 FAR BUY filled @ ${farBuyOrder.price}!`);
+                notify(`🎣 FAR BUY filled @ ${farBuyOrder.price}!`);
+                longCluster.layers.push({ price: farBuyOrder.price, qty: config.orderSize, orderId: null, status: 'FILLED', type: 'FAR' });
+                longCluster.avgPrice = clusterAvgPrice(longCluster);
+                farBuyOrder = { price: 0, orderId: null, status: 'IDLE' };
+            } else {
+                // Check if needs adjustment (price moved 50%+ toward far order)
+                const distToOrder = price - farBuyOrder.price;
+                if (distToOrder > farDist * (1 + adjustThreshold)) {
+                    await cancelOrder(farBuyOrder.orderId);
+                    farBuyOrder = { price: 0, orderId: null, status: 'IDLE' };
+                } else if (distToOrder < farDist * (1 - adjustThreshold) && distToOrder > 0) {
+                    await cancelOrder(farBuyOrder.orderId);
+                    farBuyOrder = { price: 0, orderId: null, status: 'IDLE' };
+                }
+            }
+        }
+    }
+
+    // Far Sell
+    if (config.enableFarSell) {
+        if (farSellOrder.status === 'IDLE' || !farSellOrder.orderId) {
+            const fsPrice = roundPrice(price + farDist);
+            const oid = await placeLimit('SELL', 'SHORT', fsPrice, config.orderSize);
+            if (oid && oid !== 'REJECTED_GTX') {
+                farSellOrder = { price: fsPrice, orderId: oid, status: 'PENDING' };
+            }
+        } else if (farSellOrder.status === 'PENDING') {
+            if (!openOrderIds.has(farSellOrder.orderId)) {
+                log('GRID', `🎣 FAR SELL filled @ ${farSellOrder.price}!`);
+                notify(`🎣 FAR SELL filled @ ${farSellOrder.price}!`);
+                shortCluster.layers.push({ price: farSellOrder.price, qty: config.orderSize, orderId: null, status: 'FILLED', type: 'FAR' });
+                shortCluster.avgPrice = clusterAvgPrice(shortCluster);
+                farSellOrder = { price: 0, orderId: null, status: 'IDLE' };
+            } else {
+                const distToOrder = farSellOrder.price - price;
+                if (distToOrder > farDist * (1 + adjustThreshold)) {
+                    await cancelOrder(farSellOrder.orderId);
+                    farSellOrder = { price: 0, orderId: null, status: 'IDLE' };
+                } else if (distToOrder < farDist * (1 - adjustThreshold) && distToOrder > 0) {
+                    await cancelOrder(farSellOrder.orderId);
+                    farSellOrder = { price: 0, orderId: null, status: 'IDLE' };
+                }
+            }
+        }
+    }
+
     saveState();
 }
 
-// ===================== SLOT RECONCILIATION =====================
+/**
+ * MODULE 3: Dynamic Take Profit
+ * - Slow market + many layers: TP at avg price + spacing (escape at breakeven+)
+ * - Fast market / wick bounce: Scale out in tiers for max profit
+ * - Hedged: Hold profitable side to offset losing side
+ */
+async function processTakeProfit(price, isVolatile) {
+    const tp = config.takeProfit;
+    const spacing = config.gridSpacing;
 
-async function processSlots(openOrderIds) {
-    let stateChanged = false;
+    const longFilled = clusterFilledCount(longCluster);
+    const shortFilled = clusterFilledCount(shortCluster);
+    const longQty = clusterQty(longCluster);
+    const shortQty = clusterQty(shortCluster);
+    const isHedged = longFilled > 0 && shortFilled > 0;
 
-    for (const slot of slots) {
-        const prevStatus = slot.status;
+    // === LONG TAKE PROFIT ===
+    if (longFilled > 0 && price > longCluster.avgPrice) {
+        const profitDist = price - longCluster.avgPrice;
 
-        switch (slot.status) {
-            case 'IDLE': {
-                const oid = await placeLimit(slot.entrySide, slot.posSide, slot.entryPrice, config.orderSize);
-                if (oid) {
-                    slot.orderId = oid;
-                    slot.status = 'ENTRY';
-                }
-                break;
+        if (isHedged) {
+            // Hedged mode: only close if profit covers the losing hedge side's loss
+            const shortLoss = shortFilled > 0 ? (price - shortCluster.avgPrice) * shortQty : 0;
+            const longProfit = profitDist * longQty;
+            if (longProfit > Math.abs(shortLoss) * config.hedge.hedgeUnlockMinProfit) {
+                log('TP', `🔓 Hedge unlock LONG: profit $${longProfit.toFixed(2)} > loss $${Math.abs(shortLoss).toFixed(2)}`);
+                await closeCluster(longCluster, 'SELL', 'LONG');
+                await closeCluster(shortCluster, 'BUY', 'SHORT');
+                cycleCount++;
             }
-
-            case 'ENTRY': {
-                if (!openOrderIds.has(slot.orderId)) {
-                    log('GRID', `📦 ${slot.name} ENTRY FILLED @ ${slot.entryPrice}`);
-                    notify(`📦 ${slot.name} filled @ ${slot.entryPrice}`);
-                    slot.status = 'FILLED';
-                    slot.orderId = null;
-                }
-                break;
-            }
-
-            case 'FILLED': {
-                const oid = await placeLimit(slot.tpSide, slot.posSide, slot.tpPrice, config.orderSize);
-                if (oid) {
-                    slot.orderId = oid;
-                    slot.status = 'TP';
-                    log('GRID', `🎯 ${slot.name} TP placed @ ${slot.tpPrice}`);
-                } else {
-                    log('GRID', `⚠ ${slot.name} TP rejected, closing via market`);
-                    await placeMarket(slot.tpSide, slot.posSide, config.orderSize);
-                    slot.status = 'IDLE';
-                    slot.orderId = null;
-                }
-                break;
-            }
-
-            case 'TP': {
-                if (!openOrderIds.has(slot.orderId)) {
-                    slot.fillCount++;
+        } else if (isVolatile && longFilled >= 2) {
+            // Fast market: scale out in tiers
+            if (profitDist >= spacing * 2) {
+                const closeQty = roundQty(longQty * (tp.fastScaleOut[0] || 0.5));
+                if (closeQty >= config.orderSize) {
+                    log('TP', `🚀 Fast TP LONG: closing ${closeQty} @ MKT (profit $${profitDist.toFixed(0)})`);
+                    await placeMarket('SELL', 'LONG', closeQty);
+                    removeLayersFromCluster(longCluster, closeQty);
                     cycleCount++;
-                    log('GRID', `💰 ${slot.name} TP FILLED @ ${slot.tpPrice} (cycle #${cycleCount})`);
-                    notify(`💰 ${slot.name} cycle complete @ ${slot.tpPrice} (#${cycleCount})`);
-                    slot.status = 'IDLE';
-                    slot.orderId = null;
                 }
-                break;
+            }
+        } else {
+            // Slow market: close all at avg + spacing
+            if (profitDist >= spacing * tp.slowExitSpacing) {
+                log('TP', `💰 Slow TP LONG: avg=${longCluster.avgPrice} profit=$${profitDist.toFixed(0)}`);
+                await closeCluster(longCluster, 'SELL', 'LONG');
+                cycleCount++;
             }
         }
-
-        if (slot.status !== prevStatus) stateChanged = true;
     }
 
-    // Persist state after any change
-    if (stateChanged) saveState();
+    // === SHORT TAKE PROFIT ===
+    if (shortFilled > 0 && price < shortCluster.avgPrice) {
+        const profitDist = shortCluster.avgPrice - price;
+
+        if (isHedged) {
+            const longLoss = longFilled > 0 ? (longCluster.avgPrice - price) * longQty : 0;
+            const shortProfit = profitDist * shortQty;
+            if (shortProfit > Math.abs(longLoss) * config.hedge.hedgeUnlockMinProfit) {
+                log('TP', `🔓 Hedge unlock SHORT: profit $${shortProfit.toFixed(2)} > loss $${Math.abs(longLoss).toFixed(2)}`);
+                await closeCluster(shortCluster, 'BUY', 'SHORT');
+                await closeCluster(longCluster, 'SELL', 'LONG');
+                cycleCount++;
+            }
+        } else if (isVolatile && shortFilled >= 2) {
+            if (profitDist >= spacing * 2) {
+                const closeQty = roundQty(shortQty * (tp.fastScaleOut[0] || 0.5));
+                if (closeQty >= config.orderSize) {
+                    log('TP', `🚀 Fast TP SHORT: closing ${closeQty} @ MKT (profit $${profitDist.toFixed(0)})`);
+                    await placeMarket('BUY', 'SHORT', closeQty);
+                    removeLayersFromCluster(shortCluster, closeQty);
+                    cycleCount++;
+                }
+            }
+        } else {
+            if (profitDist >= spacing * tp.slowExitSpacing) {
+                log('TP', `💰 Slow TP SHORT: avg=${shortCluster.avgPrice} profit=$${profitDist.toFixed(0)}`);
+                await closeCluster(shortCluster, 'BUY', 'SHORT');
+                cycleCount++;
+            }
+        }
+    }
+}
+
+async function closeCluster(cluster, side, posSide) {
+    // Cancel pending orders
+    for (const l of cluster.layers) {
+        if (l.status === 'PENDING' && l.orderId) await cancelOrder(l.orderId);
+    }
+    const qty = clusterQty(cluster);
+    if (qty > 0) await placeMarket(side, posSide, qty);
+    cluster.layers = [];
+    cluster.avgPrice = 0;
+    cluster.tpOrders = [];
+    notify(`💰 ${posSide} cluster closed | qty=${qty}`);
+    saveState();
+}
+
+function removeLayersFromCluster(cluster, qtyToRemove) {
+    let remaining = qtyToRemove;
+    // Remove oldest filled layers first
+    cluster.layers = cluster.layers.filter(l => {
+        if (l.status === 'FILLED' && remaining > 0) {
+            remaining = roundQty(remaining - l.qty);
+            return false;
+        }
+        return true;
+    });
+    cluster.avgPrice = clusterAvgPrice(cluster);
+    saveState();
+}
+
+/**
+ * MODULE 4: STOP_MARKET Hedge Protection
+ * - When market moves fast against position, place STOP_MARKET to hedge
+ * - Prevents account blowup by locking loss
+ */
+async function processHedgeProtection(price, isVolatile, openOrderIds) {
+    if (!config.hedge.enableStopMarket) return;
+    const h = config.hedge;
+    const spacing = config.gridSpacing;
+
+    const longFilled = clusterFilledCount(longCluster);
+    const shortFilled = clusterFilledCount(shortCluster);
+
+    // If holding LONG but no SHORT protection and market dropping fast
+    if (longFilled > 0 && shortFilled === 0 && isVolatile) {
+        if (!shortCluster.stopOrderId || !openOrderIds.has(shortCluster.stopOrderId)) {
+            const stopPrice = roundPrice(longCluster.avgPrice - spacing * h.autoHedgeThreshold);
+            if (price < longCluster.avgPrice && price > stopPrice) {
+                const hedgeQty = clusterQty(longCluster);
+                const oid = await placeStopMarket('SELL', 'SHORT', stopPrice, hedgeQty);
+                if (oid) {
+                    shortCluster.stopOrderId = oid;
+                    log('HEDGE', `🛡 STOP_MKT SELL placed @ ${stopPrice} qty=${hedgeQty} (protect LONG)`);
+                }
+            }
+        }
+    }
+
+    // If holding SHORT but no LONG protection and market pumping fast
+    if (shortFilled > 0 && longFilled === 0 && isVolatile) {
+        if (!longCluster.stopOrderId || !openOrderIds.has(longCluster.stopOrderId)) {
+            const stopPrice = roundPrice(shortCluster.avgPrice + spacing * h.autoHedgeThreshold);
+            if (price > shortCluster.avgPrice && price < stopPrice) {
+                const hedgeQty = clusterQty(shortCluster);
+                const oid = await placeStopMarket('BUY', 'LONG', stopPrice, hedgeQty);
+                if (oid) {
+                    longCluster.stopOrderId = oid;
+                    log('HEDGE', `🛡 STOP_MKT BUY placed @ ${stopPrice} qty=${hedgeQty} (protect SHORT)`);
+                }
+            }
+        }
+    }
+
+    // Check if stop orders got filled (became positions)
+    if (longCluster.stopOrderId && !openOrderIds.has(longCluster.stopOrderId)) {
+        log('HEDGE', `🔒 STOP_MKT BUY FILLED - LONG hedge activated`);
+        const hedgeQty = clusterQty(shortCluster);
+        longCluster.layers.push({ price: price, qty: hedgeQty, orderId: null, status: 'FILLED', type: 'HEDGE' });
+        longCluster.avgPrice = clusterAvgPrice(longCluster);
+        longCluster.stopOrderId = null;
+    }
+    if (shortCluster.stopOrderId && !openOrderIds.has(shortCluster.stopOrderId)) {
+        log('HEDGE', `🔒 STOP_MKT SELL FILLED - SHORT hedge activated`);
+        const hedgeQty = clusterQty(longCluster);
+        shortCluster.layers.push({ price: price, qty: hedgeQty, orderId: null, status: 'FILLED', type: 'HEDGE' });
+        shortCluster.avgPrice = clusterAvgPrice(shortCluster);
+        shortCluster.stopOrderId = null;
+    }
 }
 
 // ===================== DRAWDOWN SHIELD =====================
@@ -504,7 +547,7 @@ async function checkDrawdown(equity) {
     if (peakEquity === 0) return false;
     const dd = ((peakEquity - equity) / peakEquity) * 100;
     if (dd >= config.drawdown.maxPercent) {
-        log('SHIELD', `🚨 DRAWDOWN ${dd.toFixed(1)}% → EMERGENCY CLOSE`);
+        log('SHIELD', `🚨 DRAWDOWN ${dd.toFixed(1)}% → EMERGENCY`);
         notify(`🚨 Drawdown ${dd.toFixed(1)}%! Closing ALL!`);
         botStatus = 'EMERGENCY';
         await cancelAllOrders();
@@ -519,87 +562,86 @@ async function checkDrawdown(equity) {
     return false;
 }
 
+// ===================== VOLATILITY ENGINE =====================
+function updateVolatility(price, ticker24) {
+    const vc = config.volatility;
+    if (prevTickPrice > 0 && ticker24) {
+        const priceDelta = Math.abs(price - prevTickPrice);
+        const count = parseInt(ticker24.count);
+        const countDelta = count - (prevTradeCount || count);
+        rsPriceEma = rsPriceEma === 0 ? priceDelta : (rsPriceEma * 0.95 + priceDelta * 0.05);
+        rsTradeEma = rsTradeEma === 0 ? countDelta : (rsTradeEma * 0.95 + countDelta * 0.05);
+        const priceSurge = priceDelta > Math.max(rsPriceEma * vc.priceSurgeMultiplier, config.gridSpacing * vc.minPriceSurgeRatio);
+        const volumeSurge = countDelta > Math.max(rsTradeEma * vc.volumeSurgeMultiplier, vc.minVolumeDelta);
+        if (priceSurge || volumeSurge) {
+            volatileTicksRemaining = vc.pauseTicks;
+            log('VOL', `⚡ SPIKE: PΔ${priceDelta.toFixed(1)}(avg:${rsPriceEma.toFixed(1)}) TΔ${countDelta}(avg:${rsTradeEma.toFixed(1)})`);
+        } else if (volatileTicksRemaining > 0) { volatileTicksRemaining--; }
+        prevTradeCount = count;
+    }
+    prevTickPrice = price;
+    return volatileTicksRemaining > 0;
+}
+
 // ===================== MAIN TICK LOOP =====================
 async function tick() {
-    log('ENGINE', '🚀 Tick loop started');
-    let lastRecenter = basePrice;
-
+    log('ENGINE', '🚀 Tick started');
     while (running) {
         try {
             tickCount++;
-
-            // Fetch state in parallel
-            const [balances, prices, orders] = await Promise.all([
+            const [balances, prices, orders, ticker24] = await Promise.all([
                 binance.futuresBalance().catch(() => null),
                 binance.futuresPrices().catch(() => null),
-                binance.futuresOpenOrders(config.symbol).catch(() => [])
+                binance.futuresOpenOrders(config.symbol).catch(() => []),
+                signedRequest('GET', '/fapi/v1/ticker/24hr', { symbol: config.symbol }).catch(() => null)
             ]);
-
             if (!prices || !prices[config.symbol]) { await delay(config.tickIntervalMs); continue; }
             const price = parseFloat(prices[config.symbol]);
 
-            // Equity
             let equity = 0;
             if (balances?.length > 0) {
                 const coin = balances.find(b => config.symbol.indexOf(b.asset) > 0);
-                if (coin) {
-                    equity = parseFloat(coin.balance) + parseFloat(coin.crossUnPnl);
-                    if (peakEquity === 0) peakEquity = equity;
-                }
+                if (coin) { equity = parseFloat(coin.balance) + parseFloat(coin.crossUnPnl); if (peakEquity === 0) peakEquity = equity; }
             }
             if (startEquity > 0 && equity > 0) realProfit = equity - startEquity;
-
-            // Drawdown
             if (await checkDrawdown(equity)) break;
 
-            // ATR (periodic)
-            await updateATR();
-
-            // Build set of open order IDs
+            const isVolatile = updateVolatility(price, ticker24);
             const openOrderIds = new Set(orders.map(o => o.orderId));
 
-            // Check if any slot just completed → recenter
-            const beforeIdleCount = slots.filter(s => s.status === 'IDLE').length;
+            // Core modules
+            await processNearGrid(price, openOrderIds);
+            await processFarOrders(price, openOrderIds);
+            await processTakeProfit(price, isVolatile);
+            await processHedgeProtection(price, isVolatile, openOrderIds);
 
-            // Process all slots
-            await processSlots(openOrderIds);
+            // Create simulated slots array for backward compatibility
+            const getStatus = (c) => c.layers.length > 0 ? (c.layers.some(l=>l.status==='PENDING')?'ENTRY':'FILLED') : 'IDLE';
+            const simulatedSlots = [];
+            simulatedSlots.push({ name: 'nearBuy', status: getStatus(longCluster), entry: longCluster.avgPrice, tp: longCluster.avgPrice+config.gridSpacing, fills: clusterFilledCount(longCluster) });
+            simulatedSlots.push({ name: 'nearSell', status: getStatus(shortCluster), entry: shortCluster.avgPrice, tp: shortCluster.avgPrice-config.gridSpacing, fills: clusterFilledCount(shortCluster) });
+            simulatedSlots.push({ name: 'farBuy', status: config.enableFarBuy ? farBuyOrder.status : 'DISABLED', entry: farBuyOrder.price, tp: farBuyOrder.price+config.gridSpacing, fills: 0 });
+            simulatedSlots.push({ name: 'farSell', status: config.enableFarSell ? farSellOrder.status : 'DISABLED', entry: farSellOrder.price, tp: farSellOrder.price-config.gridSpacing, fills: 0 });
 
-            // After processing, check if new cycles completed
-            const afterIdleCount = slots.filter(s => s.status === 'IDLE').length;
-            if (afterIdleCount > beforeIdleCount && Math.abs(price - basePrice) > config.gridSpacing * 0.5) {
-                // A cycle completed AND price moved significantly → recenter
-                recenterSlots(price);
-            }
-
-            // Count stats
-            const entryCount = slots.filter(s => s.status === 'ENTRY').length;
-            const filledCount = slots.filter(s => s.status === 'FILLED' || s.status === 'TP').length;
-            const totalOrders = orders.length;
-
-            // Emit to dashboard
+            // Dashboard emit
             io.emit('status', {
                 price, equity: equity.toFixed(2), startEquity: startEquity.toFixed(2),
                 realProfit: realProfit.toFixed(2), peakEquity: peakEquity.toFixed(2),
                 drawdown: peakEquity > 0 ? ((peakEquity - equity) / peakEquity * 100).toFixed(1) : '0.0',
-                basePrice, spacing: config.gridSpacing, catchMult: config.catchMultiplier || 3,
-                atr: currentATR.toFixed(1), botStatus, totalOrders, cycleCount,
-                slots: slots.map(s => ({
-                    name: s.name, status: s.status,
-                    entry: s.entryPrice, tp: s.tpPrice,
-                    fills: s.fillCount
-                })),
-                tickCount
+                anchorPrice, spacing: config.gridSpacing, botStatus, cycleCount,
+                isVolatile, totalOrders: orders.length,
+                longLayers: longCluster.layers.length, longFilled: clusterFilledCount(longCluster), longAvg: longCluster.avgPrice,
+                shortLayers: shortCluster.layers.length, shortFilled: clusterFilledCount(shortCluster), shortAvg: shortCluster.avgPrice,
+                farBuy: farBuyOrder, farSell: farSellOrder, tickCount,
+                nearDirection: config.nearDirection,
+                slots: simulatedSlots
             });
 
-            // Summary log
             if (tickCount % 15 === 0) {
-                const slotSummary = slots.map(s => `${s.name[0].toUpperCase()}${s.name.includes('far')?'F':'N'}:${s.status[0]}`).join(' ');
-                log('SUM', `$${price} | Eq:$${equity.toFixed(2)} | P:$${realProfit.toFixed(2)} | Base:$${basePrice} | Ord:${totalOrders} | Cycles:${cycleCount} | ${slotSummary}`);
+                const lf = clusterFilledCount(longCluster), sf = clusterFilledCount(shortCluster);
+                log('SUM', `$${price} | Eq:$${equity.toFixed(2)} | P:$${realProfit.toFixed(2)} | L:${lf}/${longCluster.layers.length} S:${sf}/${shortCluster.layers.length} | Far:${farBuyOrder.status}/${farSellOrder.status} | Vol:${isVolatile?'⚡':'🌤'} | Cy:${cycleCount}`);
             }
-
-        } catch (e) {
-            log('ERROR', e.message);
-        }
+        } catch (e) { log('ERR', e.message); }
         await delay(config.tickIntervalMs);
     }
     log('ENGINE', '🛑 Stopped');
@@ -610,93 +652,77 @@ async function startBot() {
     if (running) return 'Already running';
     loadConfig();
     await setupAccount();
-
     const prices = await binance.futuresPrices();
     const price = parseFloat(prices[config.symbol]);
     if (!price) return 'Cannot get price';
 
-    // ===== TRY RECOVERY FIRST =====
-    const recovered = await recoverFromState();
-    if (recovered) {
-        log('START', '🔄 Resumed from saved state');
-        tickCount = 0;
-        running = true; botStatus = 'RUNNING'; config.run = true; saveConfig();
-        tick();
-        return `🔄 Bot RECOVERED | Base: $${basePrice} | Cycles: ${cycleCount} | Start Eq: $${startEquity.toFixed(2)}`;
-    }
-
-    // ===== FRESH START (no state file) =====
-    log('START', '🆕 Fresh start (no saved state)');
     await cancelAllOrders();
+    
+    // Initialize clusters
+    longCluster = { layers: [], tpOrders: [], stopOrderId: null, avgPrice: 0 };
+    shortCluster = { layers: [], tpOrders: [], stopOrderId: null, avgPrice: 0 };
+    
+    // Adopt existing positions instead of closing them!
     const positions = await binance.futuresPositionRisk({ symbol: config.symbol }).catch(() => []);
     for (const pos of positions) {
         const amt = Math.abs(Number(pos.positionAmt));
-        if (amt > 0) {
-            await placeMarket(pos.positionSide === 'LONG' ? 'SELL' : 'BUY', pos.positionSide, amt);
-            log('START', `Closed existing ${pos.positionSide} ${amt}`);
+        if (amt > 0) { 
+            const entryPrice = parseFloat(pos.entryPrice);
+            log('START', `Adopting existing ${pos.positionSide} position: ${amt} @ ${entryPrice}`);
+            if (pos.positionSide === 'LONG') {
+                longCluster.layers.push({ price: entryPrice, qty: amt, orderId: null, status: 'FILLED', type: 'ADOPTED' });
+            } else if (pos.positionSide === 'SHORT') {
+                shortCluster.layers.push({ price: entryPrice, qty: amt, orderId: null, status: 'FILLED', type: 'ADOPTED' });
+            }
         }
     }
+    longCluster.avgPrice = clusterAvgPrice(longCluster);
+    shortCluster.avgPrice = clusterAvgPrice(shortCluster);
     await delay(1000);
 
-    // Save start equity
     const bal = await binance.futuresBalance().catch(() => null);
     if (bal?.length > 0) {
         const coin = bal.find(b => config.symbol.indexOf(b.asset) > 0);
         if (coin) startEquity = parseFloat(coin.balance) + parseFloat(coin.crossUnPnl);
     }
 
-    initSlots(price);
+    anchorPrice = roundPrice(price);
+    farBuyOrder = { price: 0, orderId: null, status: 'IDLE' };
+    farSellOrder = { price: 0, orderId: null, status: 'IDLE' };
     realProfit = 0; peakEquity = 0; tickCount = 0; cycleCount = 0;
-    running = true; botStatus = 'RUNNING'; config.run = true; saveConfig();
-    saveState();
+    running = true; botStatus = 'RUNNING'; config.run = true; saveConfig(); saveState();
 
-    const msg = `🤖 Grid Bot v3.0 STARTED (fresh)\n` +
-        `Symbol: ${config.symbol} | Lev: ${config.leverage}x\n` +
-        `Base: $${basePrice} | Spacing: $${config.gridSpacing}\n` +
-        `Catch: ${config.catchMultiplier}x ($${config.gridSpacing * config.catchMultiplier})\n` +
-        `Start Equity: $${startEquity.toFixed(2)}\n` +
-        `Max Orders: 4 (2 near + 2 far)`;
-    notify(msg);
-    tick();
-    return msg;
+    const msg = `🤖 Hybrid Grid v5.0 STARTED\nSymbol: ${config.symbol} | Lev: ${config.leverage}x\nAnchor: $${anchorPrice} | Spacing: $${config.gridSpacing}\nMax Layers: ${config.maxNearLayers} | Far: ${config.catchMultiplier}x\nEquity: $${startEquity.toFixed(2)}`;
+    notify(msg); tick(); return msg;
 }
 
 async function stopBot() {
-    running = false; botStatus = 'IDLE'; config.run = false; saveConfig();
-    saveState(); // Save state before stopping (for potential recovery later)
-    await cancelAllOrders();
-    clearState(); // Clean state on intentional stop (no recovery needed)
-    const msg = `🛑 STOPPED | Profit: $${realProfit.toFixed(2)} | Cycles: ${cycleCount}`;
+    running = false; botStatus = 'IDLE'; config.run = false; saveConfig(); saveState();
+    await cancelAllOrders(); clearState();
+    const msg = `🛑 STOPPED | P:$${realProfit.toFixed(2)} | Cycles:${cycleCount}`;
     notify(msg); return msg;
 }
 
 async function emergencyClose() {
-    running = false; botStatus = 'EMERGENCY'; config.run = false; saveConfig();
-    clearState();
+    running = false; botStatus = 'EMERGENCY'; config.run = false; saveConfig(); clearState();
     await cancelAllOrders();
     const positions = await binance.futuresPositionRisk({ symbol: config.symbol }).catch(() => []);
     for (const pos of positions) {
         const amt = Math.abs(Number(pos.positionAmt));
         if (amt > 0) await placeMarket(pos.positionSide === 'LONG' ? 'SELL' : 'BUY', pos.positionSide, amt);
     }
-    const msg = `🚨 EMERGENCY CLOSE | Profit: $${realProfit.toFixed(2)}`;
+    const msg = `🚨 EMERGENCY CLOSE | P:$${realProfit.toFixed(2)}`;
     notify(msg); return msg;
 }
 
 // ===================== TELEGRAM =====================
-tgBot.start(ctx => ctx.reply('🤖 Grid Bot v3 | /grid_start /grid_stop /grid_status /grid_emergency'));
-tgBot.command('grid_start', async ctx => ctx.reply(await startBot()));
-tgBot.command('grid_stop', async ctx => ctx.reply(await stopBot()));
-tgBot.command('grid_emergency', async ctx => ctx.reply(await emergencyClose()));
-tgBot.command('grid_status', async ctx => {
-    let slotInfo = slots.map(s => `  ${s.name}: ${s.status} | E:${s.entryPrice} T:${s.tpPrice} | Fills:${s.fillCount}`).join('\n');
-    ctx.reply(`📊 ${botStatus} | Base: $${basePrice}\n${slotInfo}\nProfit: $${realProfit.toFixed(2)} | Cycles: ${cycleCount}`);
-});
-tgBot.command('grid_pos', async ctx => {
-    try {
-        const pos = await binance.futuresPositionRisk({ symbol: config.symbol });
-        ctx.reply(pos.map(p => `${p.positionSide}: ${Number(p.positionAmt)} @ ${Number(p.entryPrice).toFixed(2)} | PnL: ${Number(p.unRealizedProfit).toFixed(2)}`).join('\n') || 'No pos');
-    } catch (e) { ctx.reply(e.message); }
+tgBot.start(ctx => ctx.reply('🤖 Hybrid Grid v5 | /start_bot /stop_bot /status /emergency'));
+tgBot.command('start_bot', async ctx => ctx.reply(await startBot()));
+tgBot.command('stop_bot', async ctx => ctx.reply(await stopBot()));
+tgBot.command('emergency', async ctx => ctx.reply(await emergencyClose()));
+tgBot.command('status', async ctx => {
+    const lf = clusterFilledCount(longCluster), sf = clusterFilledCount(shortCluster);
+    ctx.reply(`📊 ${botStatus}\nLONG: ${lf} layers | avg:$${longCluster.avgPrice}\nSHORT: ${sf} layers | avg:$${shortCluster.avgPrice}\nP:$${realProfit.toFixed(2)} | Cy:${cycleCount}`);
 });
 
 // ===================== DASHBOARD =====================
@@ -705,7 +731,7 @@ app.use(Express.json());
 
 app.get('/grid', (req, res) => {
     res.send(`<!DOCTYPE html><html><head>
-<title>Grid Bot v3</title><meta charset="utf-8">
+<title>Hybrid Grid v5</title><meta charset="utf-8">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0e17;color:#e1e5ea;font-family:'Segoe UI',sans-serif;padding:16px;max-width:1200px;margin:0 auto}
@@ -717,55 +743,38 @@ h1{color:#00d4aa;text-align:center;font-size:20px;margin-bottom:16px}
 .tab-content{display:none}.tab-content.active{display:block}
 .controls{text-align:center;margin:12px 0}
 .btn{padding:8px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:600;margin:3px;font-size:12px}
-.btn:hover{opacity:0.85}
-.btn-start{background:#00d4aa;color:#0a0e17}
-.btn-stop{background:#ffa502;color:#0a0e17}
-.btn-emergency{background:#ff4757;color:#fff}
+.btn-start{background:#00d4aa;color:#0a0e17}.btn-stop{background:#ffa502;color:#0a0e17}.btn-emergency{background:#ff4757;color:#fff}
 .btn-save{background:#5b8def;color:#fff;padding:10px 28px;font-size:14px;margin-top:12px}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
 .stat{background:#131a2a;border:1px solid #1e2940;border-radius:10px;padding:12px}
 .stat h4{color:#5b8def;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
-.stat .v{font-size:20px;font-weight:700;color:#fff}
-.stat .sub{font-size:11px;color:#6b7a99;margin-top:2px}
+.stat .v{font-size:18px;font-weight:700;color:#fff}
 .green{color:#00d4aa!important}.red{color:#ff4757!important}.yellow{color:#ffa502!important}.purple{color:#a855f7!important}
-.slot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}
-.slot{background:#131a2a;border:1px solid #1e2940;border-radius:10px;padding:14px;position:relative}
-.slot h4{font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.slot .badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600}
-.badge-idle{background:#6b7a9922;color:#6b7a99}
-.badge-entry{background:#5b8def22;color:#5b8def}
-.badge-filled{background:#ffa50222;color:#ffa502}
-.badge-tp{background:#a855f722;color:#a855f7}
-.slot .info{font-size:12px;color:#8b9cc0;line-height:1.8}
-.slot .info span{color:#fff;font-weight:600}
-#log{background:#0d1117;border:1px solid #1e2940;border-radius:8px;padding:10px;margin-top:12px;max-height:200px;overflow-y:auto;font-family:monospace;font-size:10px;line-height:1.4}
+.cluster{background:#131a2a;border:1px solid #1e2940;border-radius:10px;padding:14px;margin-bottom:10px}
+.cluster h3{font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.cluster .info{font-size:12px;color:#8b9cc0;line-height:1.8}
+.cluster .info span{color:#fff;font-weight:600}
+#log{background:#0d1117;border:1px solid #1e2940;border-radius:8px;padding:10px;margin-top:12px;max-height:250px;overflow-y:auto;font-family:monospace;font-size:10px;line-height:1.4}
 /* Config */
 .cfg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:12px}
 .cfg-section{background:#131a2a;border:1px solid #1e2940;border-radius:12px;padding:16px}
 .cfg-section h3{color:#5b8def;font-size:12px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #1e2940;text-transform:uppercase;letter-spacing:1px}
 .cfg-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e294030}
-.cfg-row:last-child{border:none}
 .cfg-label{color:#8b9cc0;font-size:12px;flex:1}
-.cfg-label .hint{display:block;color:#4a5568;font-size:10px;margin-top:1px}
-.cfg-input{background:#0d1117;border:1px solid #1e2940;border-radius:6px;color:#e1e5ea;padding:6px 10px;font-size:13px;width:100px;text-align:right;font-family:'Segoe UI',sans-serif}
-.cfg-input:focus{outline:none;border-color:#5b8def}
+.cfg-input{background:#0d1117;border:1px solid #1e2940;border-radius:6px;color:#e1e5ea;padding:6px 10px;font-size:13px;width:100px;text-align:right;}
 .cfg-toggle{position:relative;width:44px;height:24px;cursor:pointer}
 .cfg-toggle input{display:none}
 .cfg-toggle .slider{position:absolute;top:0;left:0;right:0;bottom:0;background:#1e2940;border-radius:12px;transition:.3s}
 .cfg-toggle .slider:before{content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#6b7a99;border-radius:50%;transition:.3s}
 .cfg-toggle input:checked+.slider{background:#00d4aa30}
 .cfg-toggle input:checked+.slider:before{transform:translateX(20px);background:#00d4aa}
-.save-msg{text-align:center;margin-top:8px;font-size:12px;min-height:18px}
-.save-msg.ok{color:#00d4aa}.save-msg.err{color:#ff4757}
-.cfg-json{background:#0d111780;border:1px solid #1e2940;border-radius:8px;padding:12px;margin-top:12px;font-family:monospace;font-size:11px;line-height:1.6;max-height:180px;overflow-y:auto;white-space:pre-wrap;color:#8b9cc0}
 </style></head><body>
-<h1>🤖 4-Slot Grid Bot v3.0</h1>
+<h1>🤖 Hybrid Grid Engine v5.0</h1>
 <div class="tabs">
     <div class="tab active" onclick="switchTab('monitor')">📊 Monitor</div>
     <div class="tab" onclick="switchTab('config')">⚙️ Config</div>
 </div>
 
-<!-- MONITOR -->
 <div id="tab-monitor" class="tab-content active">
 <div class="controls">
     <button class="btn btn-start" onclick="api('start')">▶ START</button>
@@ -775,52 +784,49 @@ h1{color:#00d4aa;text-align:center;font-size:20px;margin-bottom:16px}
 <div class="stats">
     <div class="stat"><h4>Price</h4><div class="v" id="price">-</div></div>
     <div class="stat"><h4>Status</h4><div class="v" id="status">IDLE</div></div>
-    <div class="stat"><h4>Profit</h4><div class="v green" id="profit">+$0.00</div><div class="sub" id="startEq">Start: -</div></div>
+    <div class="stat"><h4>Profit</h4><div class="v green" id="profit">$0.00</div></div>
     <div class="stat"><h4>Equity</h4><div class="v" id="equity">-</div></div>
     <div class="stat"><h4>Drawdown</h4><div class="v green" id="drawdown">0.0%</div></div>
-    <div class="stat"><h4>Base / Spacing</h4><div class="v" id="baseInfo">-</div></div>
-    <div class="stat"><h4>ATR</h4><div class="v" id="atr">-</div></div>
-    <div class="stat"><h4>Cycles</h4><div class="v purple" id="cycles">0</div><div class="sub" id="ordCount">Orders: 0</div></div>
+    <div class="stat"><h4>Volatility</h4><div class="v" id="vol">🌤</div></div>
+    <div class="stat"><h4>Cycles</h4><div class="v purple" id="cycles">0</div></div>
+    <div class="stat"><h4>Orders</h4><div class="v" id="orders">0</div></div>
 </div>
-<div class="slot-grid" id="slotGrid"></div>
+<div class="cluster"><h3>📈 LONG Cluster</h3><div class="info" id="longInfo">-</div></div>
+<div class="cluster"><h3>📉 SHORT Cluster</h3><div class="info" id="shortInfo">-</div></div>
+<div class="cluster"><h3>🏹 Far Orders</h3><div class="info" id="farInfo">-</div></div>
 <div id="log"></div>
 </div>
 
-<!-- CONFIG -->
 <div id="tab-config" class="tab-content">
 <div class="cfg-grid">
     <div class="cfg-section"><h3>🔲 Grid</h3>
         <div class="cfg-row"><div class="cfg-label">Symbol</div><input class="cfg-input" id="c-symbol" style="width:120px"></div>
-        <div class="cfg-row"><div class="cfg-label">Spacing ($)<span class="hint">Khoảng cách lưới gần</span></div><input class="cfg-input" id="c-gridSpacing" type="number" step="10"></div>
-        <div class="cfg-row"><div class="cfg-label">Catch Multiplier<span class="hint">Lần × spacing cho lệnh xa</span></div><input class="cfg-input" id="c-catchMultiplier" type="number" step="0.5"></div>
-        <div class="cfg-row"><div class="cfg-label">Order Size<span class="hint">BTC mỗi lệnh</span></div><input class="cfg-input" id="c-orderSize" type="number" step="0.001"></div>
-        <div class="cfg-row"><div class="cfg-label">Leverage</div><input class="cfg-input" id="c-leverage" type="number" step="1"></div>
+        <div class="cfg-row"><div class="cfg-label">Spacing ($)</div><input class="cfg-input" id="c-gridSpacing" type="number" step="10"></div>
+        <div class="cfg-row"><div class="cfg-label">Catch Multiplier</div><input class="cfg-input" id="c-catchMultiplier" type="number" step="0.5"></div>
+        <div class="cfg-row"><div class="cfg-label">Order Size</div><input class="cfg-input" id="c-orderSize" type="number" step="0.001"></div>
+        <div class="cfg-row"><div class="cfg-label">Max Layers</div><input class="cfg-input" id="c-maxNearLayers" type="number" step="1"></div>
+    </div>
+    <div class="cfg-section"><h3>🧭 Direction</h3>
+        <div class="cfg-row"><div class="cfg-label">Near Direction</div><input class="cfg-input" id="c-nearDirection" style="width:120px"></div>
+        <div class="cfg-row"><div class="cfg-label">Enable Far Buy</div><label class="cfg-toggle"><input type="checkbox" id="c-enableFarBuy"><span class="slider"></span></label></div>
+        <div class="cfg-row"><div class="cfg-label">Enable Far Sell</div><label class="cfg-toggle"><input type="checkbox" id="c-enableFarSell"><span class="slider"></span></label></div>
+        <div class="cfg-row"><div class="cfg-label">Enable Stop Hedge</div><label class="cfg-toggle"><input type="checkbox" id="c-hedge-enableStopMarket"><span class="slider"></span></label></div>
     </div>
     <div class="cfg-section"><h3>🛡 Protection</h3>
-        <div class="cfg-row"><div class="cfg-label">Max Drawdown %<span class="hint">% tối đa trước cắt lỗ</span></div><input class="cfg-input" id="c-dd-max" type="number" step="1"></div>
-        <div class="cfg-row"><div class="cfg-label">Drawdown Enabled</div>
-            <label class="cfg-toggle"><input type="checkbox" id="c-dd-enabled"><span class="slider"></span></label></div>
-        <div class="cfg-row"><div class="cfg-label">Tick Interval (ms)<span class="hint">Chu kỳ check</span></div><input class="cfg-input" id="c-tickIntervalMs" type="number" step="500"></div>
-    </div>
-    <div class="cfg-section"><h3>📈 ATR</h3>
-        <div class="cfg-row"><div class="cfg-label">Period</div><input class="cfg-input" id="c-atr-period" type="number" step="1"></div>
-        <div class="cfg-row"><div class="cfg-label">Kline Interval</div><input class="cfg-input" id="c-atr-klineInterval" style="width:80px"></div>
+        <div class="cfg-row"><div class="cfg-label">Max Drawdown %</div><input class="cfg-input" id="c-dd-max" type="number" step="1"></div>
+        <div class="cfg-row"><div class="cfg-label">Drawdown Enabled</div><label class="cfg-toggle"><input type="checkbox" id="c-dd-enabled"><span class="slider"></span></label></div>
+        <div class="cfg-row"><div class="cfg-label">Tick Interval (ms)</div><input class="cfg-input" id="c-tickIntervalMs" type="number" step="500"></div>
     </div>
 </div>
 <div style="text-align:center;margin-top:16px">
-    <button class="btn btn-save" id="saveBtn" onclick="saveCfg()">💾 Lưu cấu hình</button>
-    <button class="btn" style="background:#1e2940;color:#6b7a99" onclick="loadCfg()">↻ Reset</button>
+    <button class="btn btn-save" onclick="saveCfg()">💾 Lưu cấu hình</button>
 </div>
-<div class="save-msg" id="saveMsg"></div>
-<h4 style="color:#5b8def;font-size:11px;margin-top:16px;text-transform:uppercase;letter-spacing:1px">📋 JSON hiện tại</h4>
-<div class="cfg-json" id="cfgJson">Loading...</div>
+<div id="saveMsg" style="text-align:center;margin-top:8px;font-size:12px;"></div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
-const logEl = document.getElementById('log');
-
+const socket=io(),logEl=document.getElementById('log');
 function switchTab(name) {
     document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
     document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
@@ -829,97 +835,101 @@ function switchTab(name) {
     if(name==='config')loadCfg();
 }
 function api(a){fetch('/api/'+a,{method:'POST'}).then(r=>r.json()).then(d=>d.msg&&addLog(d.msg))}
-function addLog(m){logEl.innerHTML+=m.replace(/\\n/g,'<br>')+'<br>';logEl.scrollTop=logEl.scrollHeight}
-
-socket.on('status', d => {
-    document.getElementById('price').textContent = '$' + Number(d.price).toLocaleString();
-    const p = parseFloat(d.realProfit);
-    document.getElementById('profit').textContent = (p>=0?'+$':'-$') + Math.abs(p).toFixed(2);
-    document.getElementById('profit').className = 'v ' + (p>=0?'green':'red');
-    document.getElementById('startEq').textContent = 'Start: $'+d.startEquity;
-    document.getElementById('equity').textContent = '$'+d.equity;
-    const dd = parseFloat(d.drawdown);
-    document.getElementById('drawdown').textContent = dd.toFixed(1)+'%';
-    document.getElementById('drawdown').className = 'v '+(dd>10?'red':dd>5?'yellow':'green');
-    document.getElementById('status').textContent = d.botStatus;
-    document.getElementById('status').className = 'v '+(d.botStatus==='RUNNING'?'green':d.botStatus==='EMERGENCY'?'red':'');
-    document.getElementById('baseInfo').textContent = '$'+d.basePrice+' / $'+d.spacing;
-    document.getElementById('atr').textContent = d.atr;
-    document.getElementById('cycles').textContent = d.cycleCount;
-    document.getElementById('ordCount').textContent = 'Orders: '+d.totalOrders;
-
-    // Render slots
-    const grid = document.getElementById('slotGrid');
-    grid.innerHTML = d.slots.map(s => {
-        const bc = {IDLE:'idle',ENTRY:'entry',FILLED:'filled',TP:'tp'}[s.status]||'idle';
-        const icon = s.name.includes('far') ? '🏹' : '🎯';
-        const dir = s.name.includes('Buy') ? '📉 BUY' : '📈 SELL';
-        return '<div class="slot"><h4>'+icon+' '+s.name+' <span class="badge badge-'+bc+'">'+s.status+'</span></h4>' +
-            '<div class="info">'+dir+'<br>Entry: <span>$'+s.entry+'</span><br>TP: <span>$'+s.tp+'</span><br>Fills: <span>'+s.fills+'</span></div></div>';
-    }).join('');
+function addLog(m){logEl.innerHTML+=m+'<br>';logEl.scrollTop=logEl.scrollHeight}
+socket.on('status',d=>{
+    document.getElementById('price').textContent='$'+Number(d.price).toLocaleString();
+    const p=parseFloat(d.realProfit);
+    document.getElementById('profit').textContent=(p>=0?'+$':'-$')+Math.abs(p).toFixed(2);
+    document.getElementById('profit').className='v '+(p>=0?'green':'red');
+    document.getElementById('equity').textContent='$'+d.equity;
+    const dd=parseFloat(d.drawdown);
+    document.getElementById('drawdown').textContent=dd.toFixed(1)+'%';
+    document.getElementById('drawdown').className='v '+(dd>10?'red':dd>5?'yellow':'green');
+    document.getElementById('status').textContent=d.botStatus;
+    document.getElementById('status').className='v '+(d.botStatus==='RUNNING'?'green':'red');
+    document.getElementById('vol').textContent=d.isVolatile?'⚡ FAST':'🌤 Calm';
+    document.getElementById('vol').className='v '+(d.isVolatile?'yellow':'green');
+    document.getElementById('cycles').textContent=d.cycleCount;
+    document.getElementById('orders').textContent=d.totalOrders;
+    document.getElementById('longInfo').innerHTML=
+        'Layers: <span>'+d.longFilled+'/'+d.longLayers+'</span> | Avg: <span>$'+d.longAvg+'</span>';
+    document.getElementById('shortInfo').innerHTML=
+        'Layers: <span>'+d.shortFilled+'/'+d.shortLayers+'</span> | Avg: <span>$'+d.shortAvg+'</span>';
+    document.getElementById('farInfo').innerHTML=
+        'Buy: <span>'+d.farBuy.status+(d.farBuy.price?' @ $'+d.farBuy.price:'')+'</span> | '+
+        'Sell: <span>'+d.farSell.status+(d.farSell.price?' @ $'+d.farSell.price:'')+'</span>';
 });
-socket.on('log', m => addLog(m));
+socket.on('log',m=>addLog(m));
 
-// Config
+// Config Logic
 const cfgFields = [
     {id:'c-symbol',path:'symbol'},{id:'c-gridSpacing',path:'gridSpacing',t:'n'},{id:'c-catchMultiplier',path:'catchMultiplier',t:'n'},
-    {id:'c-orderSize',path:'orderSize',t:'n'},{id:'c-leverage',path:'leverage',t:'n'},
+    {id:'c-orderSize',path:'orderSize',t:'n'}, {id:'c-maxNearLayers',path:'maxNearLayers',t:'n'},
+    {id:'c-nearDirection',path:'nearDirection'},{id:'c-enableFarBuy',path:'enableFarBuy',t:'b'},{id:'c-enableFarSell',path:'enableFarSell',t:'b'},
+    {id:'c-hedge-enableStopMarket',path:'hedge.enableStopMarket',t:'b'},
     {id:'c-dd-max',path:'drawdown.maxPercent',t:'n'},{id:'c-dd-enabled',path:'drawdown.trailingEnabled',t:'b'},
     {id:'c-tickIntervalMs',path:'tickIntervalMs',t:'n'},
-    {id:'c-atr-period',path:'atr.period',t:'n'},{id:'c-atr-klineInterval',path:'atr.klineInterval'},
 ];
 function gv(o,p){return p.split('.').reduce((a,k)=>a&&a[k],o)}
-function sv(o,p,v){const k=p.split('.');const l=k.pop();k.reduce((a,k)=>{if(!a[k])a[k]={};return a[k]},o)[l]=v}
+function sv(o,p,v){const k=p.split('.');const l=k.pop();k.reduce((a,k)=>{if(!a[k])a[k]={};return a[k]},o)[l]=v;}
 async function loadCfg(){
     try{const r=await fetch('/api/config');const c=await r.json();
     cfgFields.forEach(f=>{const el=document.getElementById(f.id);const v=gv(c,f.path);
     if(f.t==='b')el.checked=!!v;else el.value=v??''});
-    document.getElementById('cfgJson').textContent=JSON.stringify(c,null,2);
-    document.getElementById('saveMsg').textContent=''}catch(e){document.getElementById('saveMsg').textContent='Error';document.getElementById('saveMsg').className='save-msg err'}
+    }catch(e){}
 }
 async function saveCfg(){
     const body={};cfgFields.forEach(f=>{const el=document.getElementById(f.id);
     let v;if(f.t==='b')v=el.checked;else if(f.t==='n')v=parseFloat(el.value);else v=el.value;sv(body,f.path,v)});
     try{const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d=await r.json();if(d.ok){document.getElementById('saveMsg').textContent='✅ Saved!';document.getElementById('saveMsg').className='save-msg ok';loadCfg()}
-    else throw new Error(d.error)}catch(e){document.getElementById('saveMsg').textContent='❌ '+e.message;document.getElementById('saveMsg').className='save-msg err'}
+    const d=await r.json();if(d.ok){document.getElementById('saveMsg').textContent='✅ Saved!';document.getElementById('saveMsg').style.color='#00d4aa';loadCfg()}
+    else throw new Error(d.error)}catch(e){document.getElementById('saveMsg').textContent='❌ '+e.message;document.getElementById('saveMsg').style.color='#ff4757'}
 }
 loadCfg();
 </script></body></html>`);
 });
 
-// API
 app.post('/api/start', async (req, res) => res.json({ ok: true, msg: await startBot() }));
 app.post('/api/stop', async (req, res) => res.json({ ok: true, msg: await stopBot() }));
 app.post('/api/emergency', async (req, res) => res.json({ ok: true, msg: await emergencyClose() }));
-
 app.get('/api/config', (req, res) => { loadConfig(); res.json(config); });
 app.post('/api/config', (req, res) => {
     try {
         function merge(t, s) { for (const k of Object.keys(s)) { if (s[k] && typeof s[k]==='object' && !Array.isArray(s[k]) && t[k]) merge(t[k],s[k]); else t[k]=s[k]; } }
         merge(config, req.body); saveConfig();
-        log('CFG', 'Config updated from dashboard');
-        res.json({ ok: true });
+        log('CFG', 'Config updated'); res.json({ ok: true });
     } catch (e) { res.json({ ok: false, error: e.message }); }
 });
-
 app.get('/api/status', (req, res) => {
-    res.json({ running, botStatus, basePrice, realProfit, startEquity, peakEquity, cycleCount,
-        slots: slots.map(s => ({ name: s.name, status: s.status, entry: s.entryPrice, tp: s.tpPrice, fills: s.fillCount }))
+    const getStatus = (c) => c.layers.length > 0 ? (c.layers.some(l=>l.status==='PENDING')?'ENTRY':'FILLED') : 'IDLE';
+    const slots = [];
+    slots.push({ name: 'nearBuy', status: getStatus(longCluster), entry: longCluster.avgPrice, tp: longCluster.avgPrice+config.gridSpacing, fills: clusterFilledCount(longCluster) });
+    slots.push({ name: 'nearSell', status: getStatus(shortCluster), entry: shortCluster.avgPrice, tp: shortCluster.avgPrice-config.gridSpacing, fills: clusterFilledCount(shortCluster) });
+    slots.push({ name: 'farBuy', status: config.enableFarBuy ? farBuyOrder.status : 'DISABLED', entry: farBuyOrder.price, tp: 0, fills: 0 });
+    slots.push({ name: 'farSell', status: config.enableFarSell ? farSellOrder.status : 'DISABLED', entry: farSellOrder.price, tp: 0, fills: 0 });
+
+    res.json({ running, botStatus, anchorPrice, realProfit, startEquity, peakEquity, cycleCount, basePrice: anchorPrice,
+        slots, 
+        longCluster: { filled: clusterFilledCount(longCluster), qty: clusterQty(longCluster), avg: longCluster.avgPrice },
+        shortCluster: { filled: clusterFilledCount(shortCluster), qty: clusterQty(shortCluster), avg: shortCluster.avgPrice }
     });
 });
 
 // ===================== STARTUP =====================
 async function main() {
-    loadConfig();
-    log('MAIN', '4-Slot Grid Bot v3.0');
-    log('MAIN', `${config.symbol} | Spacing: $${config.gridSpacing} | Catch: ${config.catchMultiplier}x`);
+    loadConfig(); startConfigWatcher();
+    log('MAIN', 'Hybrid Grid Engine v5.0');
+    log('MAIN', `${config.symbol} | Spacing:$${config.gridSpacing} | MaxLayers:${config.maxNearLayers} | Far:${config.catchMultiplier}x`);
     server.listen(PORT, () => log('MAIN', `Dashboard: http://localhost:${PORT}/grid`));
-    tgBot.launch().catch(e => log('MAIN', `TG: ${e.message}`));
-    if (config.run) { log('MAIN', 'Auto-starting...'); await startBot(); }
+    const launchTg = async () => {
+        try { await tgBot.launch(); log('MAIN', '✅ TG launched'); }
+        catch (e) { if (e.message.indexOf('409') >= 0) { log('MAIN', '⚠️ TG Conflict, retry 5s'); setTimeout(launchTg, 5000); } else log('MAIN', `TG: ${e.message}`); }
+    };
+    launchTg();
+    if (config.run) { log('MAIN', 'Auto-start...'); await startBot(); }
     else log('MAIN', 'Waiting for START');
-    process.once('SIGINT', async () => { await stopBot(); tgBot.stop(); process.exit(0); });
-    process.once('SIGTERM', async () => { await stopBot(); tgBot.stop(); process.exit(0); });
+    process.once('SIGINT', async () => { if (configWatcher) configWatcher.close(); await stopBot(); tgBot.stop(); process.exit(0); });
+    process.once('SIGTERM', async () => { if (configWatcher) configWatcher.close(); await stopBot(); tgBot.stop(); process.exit(0); });
 }
 
 main().catch(e => { console.error('Fatal:', e); process.exit(1); });
